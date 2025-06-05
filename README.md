@@ -1,6 +1,7 @@
 # Game Mode
 
 A GUI to quickly switch my pc into "Game Mode" before playing a game, and back into "Desktop Mode" after I'm done.
+___________________________________________________________________________________________________________________
 
 When the "Game Mode" button is pushed it...
 
@@ -19,7 +20,7 @@ When the "Game Mode" button is pushed it...
 -Launches a custom Game Selector (launches any games listed in the Steam, Games, or Call of Duty Start Menu folders)
 
 -Plays a sound to verify speakers/headphones are working
-
+___________________________________________________________________________________________________________________
 
 When the "Desktop Mode" button is pushed it...
 
