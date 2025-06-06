@@ -104,5 +104,9 @@
   <ItemGroup>
     <EmbeddedResource Include="DVChange.exe" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="desktop.ico" />
+    <EmbeddedResource Include="game.ico" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

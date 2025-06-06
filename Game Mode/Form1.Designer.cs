@@ -1,4 +1,6 @@
-﻿namespace Game_Mode
+﻿using System;
+
+namespace Game_Mode
 {
     partial class Form1
     {
@@ -38,8 +40,10 @@
             this.btnGameMode.Name = "btnGameMode";
             this.btnGameMode.Size = new System.Drawing.Size(120, 100);
             this.btnGameMode.TabIndex = 0;
-            this.btnGameMode.Text = "Game Mode";
+            this.btnGameMode.Text = "";
             this.btnGameMode.UseVisualStyleBackColor = true;
+            this.btnGameMode.Image = LoadIcoAsBitmap("Game_Mode.game.ico", 120, 100); // Scale to button size
+            this.btnGameMode.ImageAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.btnGameMode.Click += new System.EventHandler(this.BtnGameMode_Click);
             // 
             // btnDesktopMode
@@ -48,8 +52,10 @@
             this.btnDesktopMode.Name = "btnDesktopMode";
             this.btnDesktopMode.Size = new System.Drawing.Size(120, 100);
             this.btnDesktopMode.TabIndex = 1;
-            this.btnDesktopMode.Text = "Desktop Mode";
+            this.btnDesktopMode.Text = ""; // Removed "Desktop Mode" text
             this.btnDesktopMode.UseVisualStyleBackColor = true;
+            this.btnDesktopMode.Image = LoadIcoAsBitmap("Game_Mode.desktop.ico", 120, 100); // Scale to button size
+            this.btnDesktopMode.ImageAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.btnDesktopMode.Click += new System.EventHandler(this.BtnDesktopMode_Click);
             // 
             // Form1
@@ -71,5 +77,55 @@
 
         private System.Windows.Forms.Button btnGameMode;
         private System.Windows.Forms.Button btnDesktopMode;
+
+        private System.Drawing.Bitmap LoadIcoAsBitmap(string resourceName, int targetWidth, int targetHeight)
+        {
+            try
+            {
+                // Load the embedded ICO resource
+                using (var stream = GetType().Assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error: Embedded resource '{resourceName}' not found.");
+                        return null;
+                    }
+                    using (var icon = new System.Drawing.Icon(stream))
+                    {
+                        // Get the icon's bitmap
+                        using (var originalBitmap = icon.ToBitmap())
+                        {
+                            // Calculate scaling to fit within target dimensions while preserving aspect ratio
+                            float aspectRatio = (float)originalBitmap.Width / originalBitmap.Height;
+                            int newWidth, newHeight;
+                            if (aspectRatio > (float)targetWidth / targetHeight)
+                            {
+                                newWidth = targetWidth;
+                                newHeight = (int)(targetWidth / aspectRatio);
+                            }
+                            else
+                            {
+                                newHeight = targetHeight;
+                                newWidth = (int)(targetHeight * aspectRatio);
+                            }
+
+                            // Create a new bitmap with the scaled size
+                            var scaledBitmap = new System.Drawing.Bitmap(newWidth, newHeight);
+                            using (var graphics = System.Drawing.Graphics.FromImage(scaledBitmap))
+                            {
+                                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                                graphics.DrawImage(originalBitmap, 0, 0, newWidth, newHeight);
+                            }
+                            return scaledBitmap;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading embedded ICO: {ex.Message}");
+                return null;
+            }
+        }
     }
 }
