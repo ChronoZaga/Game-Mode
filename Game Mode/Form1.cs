@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using System.Media;
+using Microsoft.Win32;
 
 namespace Game_Mode
 {
@@ -44,6 +44,37 @@ namespace Game_Mode
             {
                 Debug.WriteLine($"Failed to set form icon: {ex.Message}");
             }
+        }
+
+        private System.Drawing.Color GetWindowsAccentColor()
+        {
+            try
+            {
+                // Read the accent color from the registry
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM"))
+                {
+                    if (key != null)
+                    {
+                        object accentColor = key.GetValue("ColorizationColor");
+                        if (accentColor != null)
+                        {
+                            // Convert the DWORD (ARGB) to Color
+                            uint color = (uint)(int)accentColor;
+                            int a = (int)((color >> 24) & 0xFF);
+                            int r = (int)((color >> 16) & 0xFF);
+                            int g = (int)((color >> 8) & 0xFF);
+                            int b = (int)(color & 0xFF);
+                            return System.Drawing.Color.FromArgb(a, r, g, b);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to get accent color: {ex.Message}");
+            }
+            // Fallback to a default color if registry read fails
+            return System.Drawing.SystemColors.Control;
         }
 
         private void SimulateWinAltB()
@@ -265,6 +296,10 @@ namespace Game_Mode
         {
             try
             {
+                // Set button colors
+                btnGameMode.BackColor = GetWindowsAccentColor();
+                btnDesktopMode.BackColor = System.Drawing.SystemColors.Control;
+
                 // Set high performance power plan silently
                 ProcessStartInfo powerPlanInfo = new ProcessStartInfo
                 {
@@ -322,8 +357,8 @@ namespace Game_Mode
                 // Play Alarm03.wav after 5-second delay
                 try
                 {
-                    System.Threading.Thread.Sleep(5000);
-                    PlaySound(@"C:\WINDOWS\Media\Alarm03.wav", IntPtr.Zero, SND_FILENAME | SND_ASYNC);
+                    System.Threading.Thread.Sleep(3500);
+                    PlaySound(@"C:\WINDOWS\Media\tada.wav", IntPtr.Zero, SND_FILENAME | SND_ASYNC);
                 }
                 catch (Exception ex)
                 {
@@ -343,6 +378,10 @@ namespace Game_Mode
         {
             try
             {
+                // Set button colors
+                btnDesktopMode.BackColor = GetWindowsAccentColor();
+                btnGameMode.BackColor = System.Drawing.SystemColors.Control;
+
                 // Set balanced power plan silently
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
@@ -373,6 +412,19 @@ namespace Game_Mode
             catch (Exception)
             {
                 // Silently handle errors
+            }
+        }
+
+        private void BtnToggleHDR_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Only toggle HDR
+                SimulateWinAltB();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"BtnToggleHDR_Click failed: {ex.Message}");
             }
         }
     }
