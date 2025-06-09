@@ -7,7 +7,7 @@
     <ProjectGuid>{F94ACB43-F253-425A-8565-5C2EE5926250}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <RootNamespace>Game_Mode</RootNamespace>
-    <AssemblyName>Game Mode</AssemblyName>
+    <AssemblyName>GameMode</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -90,6 +90,7 @@
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
     </Compile>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -110,6 +111,9 @@
   <ItemGroup>
     <EmbeddedResource Include="desktop.ico" />
     <EmbeddedResource Include="game.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="gamemode.wav" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

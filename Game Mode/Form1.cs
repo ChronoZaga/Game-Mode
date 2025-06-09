@@ -354,11 +354,66 @@ namespace Game_Mode
                 // Launch NVIDIA App
                 LaunchNvidiaApp();
 
-                // Play Alarm03.wav after 5-second delay
+                // Play embedded gamemode.wav after 3.5-second delay
                 try
                 {
                     System.Threading.Thread.Sleep(3500);
-                    PlaySound(@"C:\WINDOWS\Media\tada.wav", IntPtr.Zero, SND_FILENAME | SND_ASYNC);
+                    Assembly assembly = Assembly.GetExecutingAssembly();
+                    string resourceName = "Game_Mode.gamemode.wav";
+                    using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
+                    {
+                        if (resourceStream == null)
+                        {
+                            Debug.WriteLine($"gamemode.wav resource not found. Resource name: {resourceName}");
+                            return;
+                        }
+
+                        // Create a temporary file path with a unique name
+                        string tempPath = Path.Combine(Path.GetTempPath(), $"gamemode_{Guid.NewGuid()}.wav");
+
+                        // Extract the resource to the temp file
+                        using (FileStream fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                        {
+                            resourceStream.CopyTo(fileStream);
+                        }
+
+                        // Verify the file exists and has content
+                        if (File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
+                        {
+                            Debug.WriteLine($"Attempting to play sound from: {tempPath}");
+                            bool result = PlaySound(tempPath, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
+                            if (!result)
+                            {
+                                int errorCode = Marshal.GetLastWin32Error();
+                                Debug.WriteLine($"PlaySound failed with error code: {errorCode}");
+                            }
+                            else
+                            {
+                                Debug.WriteLine($"PlaySound initiated successfully for: {tempPath}");
+                            }
+
+                            // Delay to ensure sound playback releases the file
+                            System.Threading.Thread.Sleep(2000);
+
+                            // Clean up the temp file
+                            try
+                            {
+                                if (File.Exists(tempPath))
+                                {
+                                    File.Delete(tempPath);
+                                    Debug.WriteLine($"Temporary file deleted: {tempPath}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to delete temp file {tempPath}: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"Temporary file not created or empty: {tempPath}");
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
