@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -31,6 +32,8 @@ namespace Game_Mode
         private const byte VK_B = 0x42;    // B key
         private const uint KEYEVENTF_KEYUP = 0x0002;
 
+        private readonly string iniPath;
+
         public Form1()
         {
             InitializeComponent();
@@ -44,6 +47,90 @@ namespace Game_Mode
             {
                 Debug.WriteLine($"Failed to set form icon: {ex.Message}");
             }
+
+            // Initialize INI file path (same directory as executable)
+            iniPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Game_Mode.ini");
+
+            // Create INI file if it doesn't exist
+            CreateIniFileIfNotExists();
+        }
+
+        private void CreateIniFileIfNotExists()
+        {
+            if (File.Exists(iniPath))
+                return;
+
+            try
+            {
+                // Define default INI content with all steps enabled (1)
+                string iniContent = @"[GameMode]
+SetButtonColors=1
+SetPowerPlan=1
+SetDigitalVibrance=1
+AdjustVolume=1
+ToggleHDR=1
+LaunchNvidiaControlPanel=1
+LaunchNvidiaApp=1
+PlaySound=1
+LaunchGameSelector=1
+
+[DesktopMode]
+SetButtonColors=1
+SetPowerPlan=1
+SetDigitalVibrance=1
+AdjustVolume=1
+ToggleHDR=1
+LaunchNvidiaControlPanel=1";
+
+                File.WriteAllText(iniPath, iniContent);
+                Debug.WriteLine($"Created INI file: {iniPath}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to create INI file: {ex.Message}");
+            }
+        }
+
+        private Dictionary<string, Dictionary<string, bool>> ReadIniFile()
+        {
+            var settings = new Dictionary<string, Dictionary<string, bool>>();
+            string currentSection = null;
+
+            try
+            {
+                if (!File.Exists(iniPath))
+                {
+                    Debug.WriteLine($"INI file not found: {iniPath}");
+                    return settings;
+                }
+
+                foreach (string line in File.ReadAllLines(iniPath))
+                {
+                    string trimmedLine = line.Trim();
+                    if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith(";"))
+                        continue;
+
+                    if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
+                    {
+                        currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
+                        settings[currentSection] = new Dictionary<string, bool>();
+                    }
+                    else if (currentSection != null && trimmedLine.Contains("="))
+                    {
+                        string[] parts = trimmedLine.Split(new[] { '=' }, 2);
+                        string key = parts[0].Trim();
+                        string value = parts[1].Trim();
+                        bool enabled = value == "1";
+                        settings[currentSection][key] = enabled;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to read INI file: {ex.Message}");
+            }
+
+            return settings;
         }
 
         private System.Drawing.Color GetWindowsAccentColor()
@@ -296,132 +383,166 @@ namespace Game_Mode
         {
             try
             {
+                // Read INI settings
+                var settings = ReadIniFile();
+                var gameModeSettings = settings.ContainsKey("GameMode") ? settings["GameMode"] : new Dictionary<string, bool>();
+
                 // Set button colors
-                btnGameMode.BackColor = GetWindowsAccentColor();
-                btnDesktopMode.BackColor = System.Drawing.SystemColors.Control;
+                bool setButtonColors;
+                if (!gameModeSettings.TryGetValue("SetButtonColors", out setButtonColors))
+                    setButtonColors = true;
+                if (setButtonColors)
+                {
+                    btnGameMode.BackColor = GetWindowsAccentColor();
+                    btnDesktopMode.BackColor = System.Drawing.SystemColors.Control;
+                }
 
                 // Set high performance power plan silently
-                ProcessStartInfo powerPlanInfo = new ProcessStartInfo
+                bool setPowerPlan;
+                if (!gameModeSettings.TryGetValue("SetPowerPlan", out setPowerPlan))
+                    setPowerPlan = true;
+                if (setPowerPlan)
                 {
-                    FileName = "powercfg",
-                    Arguments = "/setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                Process.Start(powerPlanInfo);
-
-                /* Commented out to disable monitor timeout changes
-                // Set monitor timeout to 0 for AC power silently
-                ProcessStartInfo monitorAcInfo = new ProcessStartInfo
-                {
-                    FileName = "powercfg",
-                    Arguments = "-x -monitor-timeout-ac 0",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                Process.Start(monitorAcInfo);
-
-                // Set monitor timeout to 0 for DC power silently
-                ProcessStartInfo monitorDcInfo = new ProcessStartInfo
-                {
-                    FileName = "powercfg",
-                    Arguments = "-x -monitor-timeout-dc 0",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                Process.Start(monitorDcInfo);
-                */
+                    ProcessStartInfo powerPlanInfo = new ProcessStartInfo
+                    {
+                        FileName = "powercfg",
+                        Arguments = "/setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    };
+                    Process.Start(powerPlanInfo);
+                }
 
                 // Set NVIDIA Digital Vibrance to 60% (argument 12) using embedded DVChange
-                RunEmbeddedDVChange("12");
+                bool setDigitalVibrance;
+                if (!gameModeSettings.TryGetValue("SetDigitalVibrance", out setDigitalVibrance))
+                    setDigitalVibrance = true;
+                if (setDigitalVibrance)
+                {
+                    RunEmbeddedDVChange("12");
+                }
 
                 // Simulate 50 volume up key presses
-                for (int i = 0; i < 50; i++)
+                bool adjustVolume;
+                if (!gameModeSettings.TryGetValue("AdjustVolume", out adjustVolume))
+                    adjustVolume = true;
+                if (adjustVolume)
                 {
-                    keybd_event(VK_VOLUME_UP, 0, 0, 0); // Key down
-                    keybd_event(VK_VOLUME_UP, 0, KEYEVENTF_KEYUP, 0); // Key up
+                    for (int i = 0; i < 50; i++)
+                    {
+                        keybd_event(VK_VOLUME_UP, 0, 0, 0); // Key down
+                        keybd_event(VK_VOLUME_UP, 0, KEYEVENTF_KEYUP, 0); // Key up
+                    }
                 }
 
                 // Toggle HDR (assumes HDR is off or needs to be enabled)
-                SimulateWinAltB();
+                bool toggleHDR;
+                if (!gameModeSettings.TryGetValue("ToggleHDR", out toggleHDR))
+                    toggleHDR = true;
+                if (toggleHDR)
+                {
+                    SimulateWinAltB();
+                }
 
                 // Launch NVIDIA Control Panel
-                LaunchNvidiaControlPanel();
+                bool launchNvidiaControlPanel;
+                if (!gameModeSettings.TryGetValue("LaunchNvidiaControlPanel", out launchNvidiaControlPanel))
+                    launchNvidiaControlPanel = true;
+                if (launchNvidiaControlPanel)
+                {
+                    LaunchNvidiaControlPanel();
+                }
 
                 // Launch NVIDIA App
-                LaunchNvidiaApp();
+                bool launchNvidiaApp;
+                if (!gameModeSettings.TryGetValue("LaunchNvidiaApp", out launchNvidiaApp))
+                    launchNvidiaApp = true;
+                if (launchNvidiaApp)
+                {
+                    LaunchNvidiaApp();
+                }
 
                 // Play embedded gamemode.wav after 3.5-second delay
-                try
+                bool playSound;
+                if (!gameModeSettings.TryGetValue("PlaySound", out playSound))
+                    playSound = true;
+                if (playSound)
                 {
-                    System.Threading.Thread.Sleep(3500);
-                    Assembly assembly = Assembly.GetExecutingAssembly();
-                    string resourceName = "Game_Mode.gamemode.wav";
-                    using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
+                    try
                     {
-                        if (resourceStream == null)
+                        System.Threading.Thread.Sleep(3500);
+                        Assembly assembly = Assembly.GetExecutingAssembly();
+                        string resourceName = "Game_Mode.gamemode.wav";
+                        using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
                         {
-                            Debug.WriteLine($"gamemode.wav resource not found. Resource name: {resourceName}");
-                            return;
-                        }
-
-                        // Create a temporary file path with a unique name
-                        string tempPath = Path.Combine(Path.GetTempPath(), $"gamemode_{Guid.NewGuid()}.wav");
-
-                        // Extract the resource to the temp file
-                        using (FileStream fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
-                        {
-                            resourceStream.CopyTo(fileStream);
-                        }
-
-                        // Verify the file exists and has content
-                        if (File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
-                        {
-                            Debug.WriteLine($"Attempting to play sound from: {tempPath}");
-                            bool result = PlaySound(tempPath, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
-                            if (!result)
+                            if (resourceStream == null)
                             {
-                                int errorCode = Marshal.GetLastWin32Error();
-                                Debug.WriteLine($"PlaySound failed with error code: {errorCode}");
+                                Debug.WriteLine($"gamemode.wav resource not found. Resource name: {resourceName}");
+                                return;
+                            }
+
+                            // Create a temporary file path with a unique name
+                            string tempPath = Path.Combine(Path.GetTempPath(), $"gamemode_{Guid.NewGuid()}.wav");
+
+                            // Extract the resource to the temp file
+                            using (FileStream fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                            {
+                                resourceStream.CopyTo(fileStream);
+                            }
+
+                            // Verify the file exists and has content
+                            if (File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
+                            {
+                                Debug.WriteLine($"Attempting to play sound from: {tempPath}");
+                                bool result = PlaySound(tempPath, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
+                                if (!result)
+                                {
+                                    int errorCode = Marshal.GetLastWin32Error();
+                                    Debug.WriteLine($"PlaySound failed with error code: {errorCode}");
+                                }
+                                else
+                                {
+                                    Debug.WriteLine($"PlaySound initiated successfully for: {tempPath}");
+                                }
+
+                                // Delay to ensure sound playback releases the file
+                                System.Threading.Thread.Sleep(2000);
+
+                                // Clean up the temp file
+                                try
+                                {
+                                    if (File.Exists(tempPath))
+                                    {
+                                        File.Delete(tempPath);
+                                        Debug.WriteLine($"Temporary file deleted: {tempPath}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"Failed to delete temp file {tempPath}: {ex.Message}");
+                                }
                             }
                             else
                             {
-                                Debug.WriteLine($"PlaySound initiated successfully for: {tempPath}");
+                                Debug.WriteLine($"Temporary file not created or empty: {tempPath}");
                             }
-
-                            // Delay to ensure sound playback releases the file
-                            System.Threading.Thread.Sleep(2000);
-
-                            // Clean up the temp file
-                            try
-                            {
-                                if (File.Exists(tempPath))
-                                {
-                                    File.Delete(tempPath);
-                                    Debug.WriteLine($"Temporary file deleted: {tempPath}");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"Failed to delete temp file {tempPath}: {ex.Message}");
-                            }
-                        }
-                        else
-                        {
-                            Debug.WriteLine($"Temporary file not created or empty: {tempPath}");
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Failed to play sound: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to play sound: {ex.Message}");
+                    }
                 }
 
                 // Launch game selector
-                LaunchGameSelector();
+                bool launchGameSelector;
+                if (!gameModeSettings.TryGetValue("LaunchGameSelector", out launchGameSelector))
+                    launchGameSelector = true;
+                if (launchGameSelector)
+                {
+                    LaunchGameSelector();
+                }
             }
             catch (Exception)
             {
@@ -433,36 +554,76 @@ namespace Game_Mode
         {
             try
             {
+                // Read INI settings
+                var settings = ReadIniFile();
+                var desktopModeSettings = settings.ContainsKey("DesktopMode") ? settings["DesktopMode"] : new Dictionary<string, bool>();
+
                 // Set button colors
-                btnDesktopMode.BackColor = GetWindowsAccentColor();
-                btnGameMode.BackColor = System.Drawing.SystemColors.Control;
+                bool setButtonColors;
+                if (!desktopModeSettings.TryGetValue("SetButtonColors", out setButtonColors))
+                    setButtonColors = true;
+                if (setButtonColors)
+                {
+                    btnDesktopMode.BackColor = GetWindowsAccentColor();
+                    btnGameMode.BackColor = System.Drawing.SystemColors.Control;
+                }
 
                 // Set balanced power plan silently
-                ProcessStartInfo startInfo = new ProcessStartInfo
+                bool setPowerPlan;
+                if (!desktopModeSettings.TryGetValue("SetPowerPlan", out setPowerPlan))
+                    setPowerPlan = true;
+                if (setPowerPlan)
                 {
-                    FileName = "powercfg",
-                    Arguments = "/setactive 381b4222-f694-41f0-9685-ff5bb260df2e",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                Process.Start(startInfo);
+                    ProcessStartInfo startInfo = new ProcessStartInfo
+                    {
+                        FileName = "powercfg",
+                        Arguments = "/setactive 381b4222-f694-41f0-9685-ff5bb260df2e",
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    };
+                    Process.Start(startInfo);
+                }
 
                 // Set NVIDIA Digital Vibrance to 50% (argument 0) using embedded DVChange
-                RunEmbeddedDVChange("0");
+                bool setDigitalVibrance;
+                if (!desktopModeSettings.TryGetValue("SetDigitalVibrance", out setDigitalVibrance))
+                    setDigitalVibrance = true;
+                if (setDigitalVibrance)
+                {
+                    RunEmbeddedDVChange("0");
+                }
 
                 // Simulate 50 volume down key presses
-                for (int i = 0; i < 50; i++)
+                bool adjustVolume;
+                if (!desktopModeSettings.TryGetValue("AdjustVolume", out adjustVolume))
+                    adjustVolume = true;
+                if (adjustVolume)
                 {
-                    keybd_event(VK_VOLUME_DOWN, 0, 0, 0); // Key down
-                    keybd_event(VK_VOLUME_DOWN, 0, KEYEVENTF_KEYUP, 0); // Key up
+                    for (int i = 0; i < 50; i++)
+                    {
+                        keybd_event(VK_VOLUME_DOWN, 0, 0, 0); // Key down
+                        keybd_event(VK_VOLUME_DOWN, 0, KEYEVENTF_KEYUP, 0); // Key up
+                    }
                 }
 
                 // Toggle HDR (assumes HDR is on or needs to be disabled)
-                SimulateWinAltB();
+                bool toggleHDR;
+                if (!desktopModeSettings.TryGetValue("ToggleHDR", out toggleHDR))
+                    toggleHDR = true;
+                if (toggleHDR)
+                {
+                    SimulateWinAltB();
+                }
 
                 // Launch NVIDIA Control Panel
-                LaunchNvidiaControlPanel();
+                bool launchNvidiaControlPanel;
+                if (!desktopModeSettings.TryGetValue("LaunchNvidiaControlPanel", out launchNvidiaControlPanel))
+                    launchNvidiaControlPanel = true;
+                if (launchNvidiaControlPanel)
+                {
+                    LaunchNvidiaControlPanel();
+                }
             }
             catch (Exception)
             {
