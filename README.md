@@ -5,6 +5,8 @@ ________________________________________________________________________________
 
 When the "Game Mode" button is pushed it...
 
+-Launches a custom Game Selector (which will launch any game listed in the Steam, Games, or Call of Duty Start Menu folders)
+
 -Sets high performance power plan
 
 -Sets Nvidia digital vibrance to 60% (Using embedded DVChange.exe by eXist73)
@@ -16,8 +18,6 @@ When the "Game Mode" button is pushed it...
 -Launches Nvidia Control Panel (for any driver/setting tweaks)
 
 -Launches the Nvidia App (for any driver/setting tweaks)
-
--Launches a custom Game Selector (which will launch any game listed in the Steam, Games, or Call of Duty Start Menu folders)
 
 -Plays a sound to verify speakers/headphones are working
 ___________________________________________________________________________________________________________________
