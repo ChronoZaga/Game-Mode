@@ -62,9 +62,10 @@ namespace Game_Mode
 
             try
             {
-                // Define default INI content with all steps enabled (1)
+                // Define default INI content with steps ordered by execution
                 string iniContent = @"[GameMode]
 SetButtonColors=1
+LaunchGameSelector=1
 SetPowerPlan=1
 SetDigitalVibrance=1
 AdjustVolume=1
@@ -72,7 +73,6 @@ ToggleHDR=1
 LaunchNvidiaControlPanel=1
 LaunchNvidiaApp=1
 PlaySound=1
-LaunchGameSelector=1
 
 [DesktopMode]
 SetButtonColors=1
@@ -301,77 +301,86 @@ LaunchNvidiaControlPanel=1";
                 }
 
                 // Create a new form for game selection
-                using (Form selectorForm = new Form())
+                Form selectorForm = new Form();
+                // Set the game selector form icon to the gamepad icon from joy.cpl
+                try
                 {
-                    // Set the game selector form icon to the gamepad icon from joy.cpl
-                    try
-                    {
-                        selectorForm.Icon = System.Drawing.Icon.ExtractAssociatedIcon(@"C:\Windows\System32\joy.cpl");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Failed to set game selector form icon: {ex.Message}");
-                    }
+                    selectorForm.Icon = System.Drawing.Icon.ExtractAssociatedIcon(@"C:\Windows\System32\joy.cpl");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to set game selector form icon: {ex.Message}");
+                }
 
-                    selectorForm.Text = "Choose a Game";
-                    selectorForm.Size = new System.Drawing.Size(300, 400);
-                    selectorForm.StartPosition = FormStartPosition.CenterParent;
-                    selectorForm.FormBorderStyle = FormBorderStyle.FixedSingle;
-                    selectorForm.MaximizeBox = false;
-                    selectorForm.MinimizeBox = false;
+                selectorForm.Text = "Choose a Game";
+                selectorForm.Size = new System.Drawing.Size(300, 400);
+                selectorForm.StartPosition = FormStartPosition.Manual;
+                // Position in upper right corner
+                var screen = Screen.PrimaryScreen.WorkingArea;
+                selectorForm.Location = new System.Drawing.Point(screen.Width - selectorForm.Width, 0);
+                selectorForm.FormBorderStyle = FormBorderStyle.FixedSingle;
+                selectorForm.MaximizeBox = false;
+                selectorForm.MinimizeBox = false;
 
-                    ListBox listBox = new ListBox
-                    {
-                        Dock = DockStyle.Fill,
-                        SelectionMode = SelectionMode.One
-                    };
-                    foreach (var game in games)
-                    {
-                        listBox.Items.Add(new { Display = game.BaseName, Path = game.FullName });
-                    }
-                    listBox.DisplayMember = "Display";
+                ListBox listBox = new ListBox
+                {
+                    Dock = DockStyle.Fill,
+                    SelectionMode = SelectionMode.One
+                };
+                foreach (var game in games)
+                {
+                    listBox.Items.Add(new { Display = game.BaseName, Path = game.FullName });
+                }
+                listBox.DisplayMember = "Display";
 
-                    Button okButton = new Button
-                    {
-                        Text = "OK",
-                        Dock = DockStyle.Bottom,
-                        Height = 30
-                    };
-                    okButton.Click += (s, e) =>
-                    {
-                        if (listBox.SelectedItem != null)
-                        {
-                            selectorForm.DialogResult = DialogResult.OK;
-                            selectorForm.Close();
-                        }
-                    };
-
-                    Button cancelButton = new Button
-                    {
-                        Text = "Cancel",
-                        Dock = DockStyle.Bottom,
-                        Height = 30
-                    };
-                    cancelButton.Click += (s, e) => selectorForm.Close();
-
-                    selectorForm.Controls.Add(listBox);
-                    selectorForm.Controls.Add(okButton);
-                    selectorForm.Controls.Add(cancelButton);
-
-                    if (selectorForm.ShowDialog() == DialogResult.OK)
+                Button okButton = new Button
+                {
+                    Text = "OK",
+                    Dock = DockStyle.Bottom,
+                    Height = 30
+                };
+                okButton.Click += (s, e) =>
+                {
+                    if (listBox.SelectedItem != null)
                     {
                         var selected = listBox.SelectedItem as dynamic;
                         if (selected != null)
                         {
-                            ProcessStartInfo startInfo = new ProcessStartInfo
+                            try
                             {
-                                FileName = selected.Path,
-                                UseShellExecute = true
-                            };
-                            Process.Start(startInfo);
+                                ProcessStartInfo startInfo = new ProcessStartInfo
+                                {
+                                    FileName = selected.Path,
+                                    UseShellExecute = true
+                                };
+                                Process.Start(startInfo);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to launch game: {ex.Message}");
+                            }
                         }
+                        selectorForm.Close();
                     }
-                }
+                };
+
+                Button cancelButton = new Button
+                {
+                    Text = "Cancel",
+                    Dock = DockStyle.Bottom,
+                    Height = 30
+                };
+                cancelButton.Click += (s, e) => selectorForm.Close();
+
+                selectorForm.Controls.Add(listBox);
+                selectorForm.Controls.Add(okButton);
+                selectorForm.Controls.Add(cancelButton);
+
+                // Ensure form is disposed when closed
+                selectorForm.FormClosed += (s, e) => selectorForm.Dispose();
+
+                // Show the form modelessly (non-blocking)
+                selectorForm.Show();
             }
             catch (Exception ex)
             {
@@ -395,6 +404,15 @@ LaunchNvidiaControlPanel=1";
                 {
                     btnGameMode.BackColor = GetWindowsAccentColor();
                     btnDesktopMode.BackColor = System.Drawing.SystemColors.Control;
+                }
+
+                // Launch game selector
+                bool launchGameSelector;
+                if (!gameModeSettings.TryGetValue("LaunchGameSelector", out launchGameSelector))
+                    launchGameSelector = true;
+                if (launchGameSelector)
+                {
+                    LaunchGameSelector();
                 }
 
                 // Set high performance power plan silently
@@ -533,15 +551,6 @@ LaunchNvidiaControlPanel=1";
                     {
                         Debug.WriteLine($"Failed to play sound: {ex.Message}");
                     }
-                }
-
-                // Launch game selector
-                bool launchGameSelector;
-                if (!gameModeSettings.TryGetValue("LaunchGameSelector", out launchGameSelector))
-                    launchGameSelector = true;
-                if (launchGameSelector)
-                {
-                    LaunchGameSelector();
                 }
             }
             catch (Exception)
