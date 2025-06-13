@@ -80,7 +80,15 @@ SetPowerPlan=1
 SetDigitalVibrance=1
 AdjustVolume=1
 ToggleHDR=1
-LaunchNvidiaControlPanel=1";
+LaunchNvidiaControlPanel=1
+
+[GameModeLaunchAlso]
+;C:\Path\To\Example1.exe
+;C:\Path\To\Example2.exe
+
+[DesktopModeLaunchAlso]
+;C:\Path\To\Example3.exe
+;C:\Path\To\Example4.exe";
 
                 File.WriteAllText(iniPath, iniContent);
                 Debug.WriteLine($"Created INI file: {iniPath}");
@@ -94,6 +102,7 @@ LaunchNvidiaControlPanel=1";
         private Dictionary<string, Dictionary<string, bool>> ReadIniFile()
         {
             var settings = new Dictionary<string, Dictionary<string, bool>>();
+            var launchAlsoSettings = new Dictionary<string, List<string>>();
             string currentSection = null;
 
             try
@@ -113,17 +122,42 @@ LaunchNvidiaControlPanel=1";
                     if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
                     {
                         currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
-                        settings[currentSection] = new Dictionary<string, bool>();
+                        if (currentSection == "GameModeLaunchAlso" || currentSection == "DesktopModeLaunchAlso")
+                        {
+                            launchAlsoSettings[currentSection] = new List<string>();
+                        }
+                        else
+                        {
+                            settings[currentSection] = new Dictionary<string, bool>();
+                        }
                     }
-                    else if (currentSection != null && trimmedLine.Contains("="))
+                    else if (currentSection != null)
                     {
-                        string[] parts = trimmedLine.Split(new[] { '=' }, 2);
-                        string key = parts[0].Trim();
-                        string value = parts[1].Trim();
-                        bool enabled = value == "1";
-                        settings[currentSection][key] = enabled;
+                        if (currentSection == "GameModeLaunchAlso" || currentSection == "DesktopModeLaunchAlso")
+                        {
+                            if (!string.IsNullOrWhiteSpace(trimmedLine))
+                            {
+                                launchAlsoSettings[currentSection].Add(trimmedLine);
+                            }
+                        }
+                        else if (trimmedLine.Contains("="))
+                        {
+                            string[] parts = trimmedLine.Split(new[] { '=' }, 2);
+                            string key = parts[0].Trim();
+                            string value = parts[1].Trim();
+                            bool enabled = value == "1";
+                            settings[currentSection][key] = enabled;
+                        }
                     }
                 }
+
+                // Store launchAlsoSettings in settings for simplicity
+                settings["GameModeLaunchAlso"] = launchAlsoSettings.ContainsKey("GameModeLaunchAlso")
+                    ? launchAlsoSettings["GameModeLaunchAlso"].ToDictionary(path => path, _ => true)
+                    : new Dictionary<string, bool>();
+                settings["DesktopModeLaunchAlso"] = launchAlsoSettings.ContainsKey("DesktopModeLaunchAlso")
+                    ? launchAlsoSettings["DesktopModeLaunchAlso"].ToDictionary(path => path, _ => true)
+                    : new Dictionary<string, bool>();
             }
             catch (Exception ex)
             {
@@ -347,6 +381,7 @@ LaunchNvidiaControlPanel=1";
                         if (selected != null)
                         {
                             try
+<<<<<<< HEAD
                             {
                                 ProcessStartInfo startInfo = new ProcessStartInfo
                                 {
@@ -357,6 +392,18 @@ LaunchNvidiaControlPanel=1";
                             }
                             catch (Exception ex)
                             {
+=======
+                            {
+                                ProcessStartInfo startInfo = new ProcessStartInfo
+                                {
+                                    FileName = selected.Path,
+                                    UseShellExecute = true
+                                };
+                                Process.Start(startInfo);
+                            }
+                            catch (Exception ex)
+                            {
+>>>>>>> Added the ability to launch other programs when one of the bottons is pushed, by adding paths to the INI file.Cleaned up code a little and made the game selector asynchronous.
                                 Debug.WriteLine($"Failed to launch game: {ex.Message}");
                             }
                         }
@@ -479,6 +526,33 @@ LaunchNvidiaControlPanel=1";
                 if (launchNvidiaApp)
                 {
                     LaunchNvidiaApp();
+                }
+
+                // Launch additional EXEs from GameModeLaunchAlso
+                var gameModeLaunchAlso = settings.ContainsKey("GameModeLaunchAlso") ? settings["GameModeLaunchAlso"] : new Dictionary<string, bool>();
+                foreach (var exePath in gameModeLaunchAlso.Keys)
+                {
+                    try
+                    {
+                        if (File.Exists(exePath))
+                        {
+                            ProcessStartInfo startInfo = new ProcessStartInfo
+                            {
+                                FileName = exePath,
+                                UseShellExecute = true
+                            };
+                            Process.Start(startInfo);
+                            Debug.WriteLine($"Launched additional EXE: {exePath}");
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"EXE not found: {exePath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to launch additional EXE {exePath}: {ex.Message}");
+                    }
                 }
 
                 // Play embedded gamemode.wav after 3.5-second delay
@@ -632,6 +706,33 @@ LaunchNvidiaControlPanel=1";
                 if (launchNvidiaControlPanel)
                 {
                     LaunchNvidiaControlPanel();
+                }
+
+                // Launch additional EXEs from DesktopModeLaunchAlso
+                var desktopModeLaunchAlso = settings.ContainsKey("DesktopModeLaunchAlso") ? settings["DesktopModeLaunchAlso"] : new Dictionary<string, bool>();
+                foreach (var exePath in desktopModeLaunchAlso.Keys)
+                {
+                    try
+                    {
+                        if (File.Exists(exePath))
+                        {
+                            ProcessStartInfo startInfo = new ProcessStartInfo
+                            {
+                                FileName = exePath,
+                                UseShellExecute = true
+                            };
+                            Process.Start(startInfo);
+                            Debug.WriteLine($"Launched additional EXE: {exePath}");
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"EXE not found: {exePath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to launch additional EXE {exePath}: {ex.Message}");
+                    }
                 }
             }
             catch (Exception)
