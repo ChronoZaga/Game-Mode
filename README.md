@@ -15,11 +15,7 @@ When the "Game Mode" button is pushed it...
 
 -Toggles HDR On (with "win+alt+B" virtual keyboard button presses)
 
--Launches Nvidia Control Panel (for any driver/setting tweaks)
-
--Launches the Nvidia App (for any driver/setting tweaks)
-
--Launches any program user listed in the INI file
+-Launches any program listed in the INI file
 
 -Plays a sound to verify speakers/headphones are working
 ___________________________________________________________________________________________________________________
@@ -33,7 +29,5 @@ When the "Desktop Mode" button is pushed it...
 -Turns the sound volume down to 0%/Muted (with "volume down" virtual keyboard button presses)
 
 -Toggles HDR Off (with "win+alt+B" virtual keyboard button presses)
-
--Launches Nvidia Control Panel (for resetting any driver/setting tweaks)
 
 -Launches any program user listed in the INI file
