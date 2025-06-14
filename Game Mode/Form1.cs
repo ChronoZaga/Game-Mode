@@ -70,8 +70,6 @@ SetPowerPlan=1
 SetDigitalVibrance=1
 AdjustVolume=1
 ToggleHDR=1
-LaunchNvidiaControlPanel=1
-LaunchNvidiaApp=1
 PlaySound=1
 
 [DesktopMode]
@@ -80,7 +78,6 @@ SetPowerPlan=1
 SetDigitalVibrance=1
 AdjustVolume=1
 ToggleHDR=1
-LaunchNvidiaControlPanel=1
 
 [GameModeLaunchAlso]
 ;C:\Path\To\Example1.exe
@@ -214,47 +211,6 @@ LaunchNvidiaControlPanel=1
             keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0); // Alt up
             keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0); // Win up
             System.Threading.Thread.Sleep(50);         // Brief delay to ensure toggle completes
-        }
-
-        private void LaunchNvidiaControlPanel()
-        {
-            try
-            {
-                // Attempt to launch NVIDIA Control Panel using the package family name
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    Arguments = "shell:appsFolder\\NVIDIACorp.NVIDIAControlPanel_56jybvy8sckqj!NVIDIACorp.NVIDIAControlPanel",
-                    CreateNoWindow = true,
-                    UseShellExecute = true,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                Process.Start(startInfo);
-            }
-            catch (Exception)
-            {
-                // Silently handle errors, consistent with existing error handling
-            }
-        }
-
-        private void LaunchNvidiaApp()
-        {
-            try
-            {
-                // Attempt to launch NVIDIA App from the updated installation path
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = @"C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                Process.Start(startInfo);
-            }
-            catch (Exception)
-            {
-                // Silently handle errors, consistent with existing error handling
-            }
         }
 
         private void RunEmbeddedDVChange(string argument)
@@ -502,24 +458,6 @@ LaunchNvidiaControlPanel=1
                     SimulateWinAltB();
                 }
 
-                // Launch NVIDIA Control Panel
-                bool launchNvidiaControlPanel;
-                if (!gameModeSettings.TryGetValue("LaunchNvidiaControlPanel", out launchNvidiaControlPanel))
-                    launchNvidiaControlPanel = true;
-                if (launchNvidiaControlPanel)
-                {
-                    LaunchNvidiaControlPanel();
-                }
-
-                // Launch NVIDIA App
-                bool launchNvidiaApp;
-                if (!gameModeSettings.TryGetValue("LaunchNvidiaApp", out launchNvidiaApp))
-                    launchNvidiaApp = true;
-                if (launchNvidiaApp)
-                {
-                    LaunchNvidiaApp();
-                }
-
                 // Launch additional EXEs from GameModeLaunchAlso
                 var gameModeLaunchAlso = settings.ContainsKey("GameModeLaunchAlso") ? settings["GameModeLaunchAlso"] : new Dictionary<string, bool>();
                 foreach (var exePath in gameModeLaunchAlso.Keys)
@@ -689,15 +627,6 @@ LaunchNvidiaControlPanel=1
                 if (toggleHDR)
                 {
                     SimulateWinAltB();
-                }
-
-                // Launch NVIDIA Control Panel
-                bool launchNvidiaControlPanel;
-                if (!desktopModeSettings.TryGetValue("LaunchNvidiaControlPanel", out launchNvidiaControlPanel))
-                    launchNvidiaControlPanel = true;
-                if (launchNvidiaControlPanel)
-                {
-                    LaunchNvidiaControlPanel();
                 }
 
                 // Launch additional EXEs from DesktopModeLaunchAlso
