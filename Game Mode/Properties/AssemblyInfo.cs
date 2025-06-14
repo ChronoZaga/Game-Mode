@@ -29,10 +29,5 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-<<<<<<< HEAD
-[assembly: AssemblyVersion("1.5.0.0")]
-[assembly: AssemblyFileVersion("1.5.0.0")]
-=======
 [assembly: AssemblyVersion("1.6.0.0")]
 [assembly: AssemblyFileVersion("1.6.0.0")]
->>>>>>> Added the ability to launch other programs when one of the bottons is pushed, by adding paths to the INI file.Cleaned up code a little and made the game selector asynchronous.
