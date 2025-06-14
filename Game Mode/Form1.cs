@@ -85,10 +85,15 @@ LaunchNvidiaControlPanel=1
 [GameModeLaunchAlso]
 ;C:\Path\To\Example1.exe
 ;C:\Path\To\Example2.exe
+;C:\Program Files\Cheat Happens Aurora\Aurora.exe
+;C:\Program Files\WindowsApps\NVIDIACorp.NVIDIAControlPanel_8.1.968.0_x64__56jybvy8sckqj\nvcplui.exe
+;C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe
 
 [DesktopModeLaunchAlso]
 ;C:\Path\To\Example3.exe
-;C:\Path\To\Example4.exe";
+;C:\Path\To\Example4.exe
+;C:\Program Files\WindowsApps\NVIDIACorp.NVIDIAControlPanel_8.1.968.0_x64__56jybvy8sckqj\nvcplui.exe
+";
 
                 File.WriteAllText(iniPath, iniContent);
                 Debug.WriteLine($"Created INI file: {iniPath}");
@@ -381,7 +386,6 @@ LaunchNvidiaControlPanel=1
                         if (selected != null)
                         {
                             try
-<<<<<<< HEAD
                             {
                                 ProcessStartInfo startInfo = new ProcessStartInfo
                                 {
@@ -392,18 +396,6 @@ LaunchNvidiaControlPanel=1
                             }
                             catch (Exception ex)
                             {
-=======
-                            {
-                                ProcessStartInfo startInfo = new ProcessStartInfo
-                                {
-                                    FileName = selected.Path,
-                                    UseShellExecute = true
-                                };
-                                Process.Start(startInfo);
-                            }
-                            catch (Exception ex)
-                            {
->>>>>>> Added the ability to launch other programs when one of the bottons is pushed, by adding paths to the INI file.Cleaned up code a little and made the game selector asynchronous.
                                 Debug.WriteLine($"Failed to launch game: {ex.Message}");
                             }
                         }
