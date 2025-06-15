@@ -284,7 +284,13 @@ ToggleHDR=1
                         FullName = file
                     })
                     .Where(g => g.BaseName != "Steam" && g.BaseName != "Steam Support Center")
-                    .OrderBy(g => g.BaseName)
+                    .Select(g => new
+                    {
+                        g.BaseName,
+                        g.FullName,
+                        SortName = GetSortName(g.BaseName)
+                    })
+                    .OrderBy(g => g.SortName)
                     .GroupBy(g => g.BaseName)
                     .Select(g => g.First()) // Remove duplicates by BaseName
                     .ToList();
@@ -381,6 +387,17 @@ ToggleHDR=1
             {
                 Debug.WriteLine($"LaunchGameSelector failed: {ex.Message}");
             }
+        }
+
+        private string GetSortName(string baseName)
+        {
+            string[] words = baseName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length > 1 && (string.Equals(words[0], "A", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(words[0], "The", StringComparison.OrdinalIgnoreCase)))
+            {
+                return string.Join(" ", words.Skip(1));
+            }
+            return baseName;
         }
 
         private void BtnGameMode_Click(object sender, EventArgs e)
