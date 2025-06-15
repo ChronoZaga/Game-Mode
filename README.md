@@ -1,6 +1,6 @@
 # Game Mode
 
-A GUI to quickly switch my pc into "Game Mode" before playing a game, and back into "Desktop Mode" after I'm done.
+A GUI to quickly switch my pc into "Game Mode" before playing a game, and back into "Desktop Mode" after I'm done.  Use the included INI file to change settings.
 ___________________________________________________________________________________________________________________
 
 When the "Game Mode" button is pushed it...
