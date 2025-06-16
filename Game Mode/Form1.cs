@@ -90,6 +90,15 @@ ToggleHDR=1
 ;C:\Path\To\Example3.exe
 ;C:\Path\To\Example4.exe
 ;C:\Program Files\WindowsApps\NVIDIACorp.NVIDIAControlPanel_8.1.968.0_x64__56jybvy8sckqj\nvcplui.exe
+
+[GameSelectorFolders]
+Steam
+Call of Duty
+Games
+
+[GameSelectorExclusions]
+Steam
+Steam Support Center
 ";
 
                 File.WriteAllText(iniPath, iniContent);
@@ -105,6 +114,8 @@ ToggleHDR=1
         {
             var settings = new Dictionary<string, Dictionary<string, bool>>();
             var launchAlsoSettings = new Dictionary<string, List<string>>();
+            var gameSelectorFolders = new List<string>();
+            var gameSelectorExclusions = new List<string>();
             string currentSection = null;
 
             try
@@ -128,6 +139,14 @@ ToggleHDR=1
                         {
                             launchAlsoSettings[currentSection] = new List<string>();
                         }
+                        else if (currentSection == "GameSelectorFolders" || currentSection == "GameSelectorExclusions")
+                        {
+                            // Initialize lists for folder and exclusion sections
+                            if (currentSection == "GameSelectorFolders")
+                                gameSelectorFolders = new List<string>();
+                            else
+                                gameSelectorExclusions = new List<string>();
+                        }
                         else
                         {
                             settings[currentSection] = new Dictionary<string, bool>();
@@ -140,6 +159,16 @@ ToggleHDR=1
                             if (!string.IsNullOrWhiteSpace(trimmedLine))
                             {
                                 launchAlsoSettings[currentSection].Add(trimmedLine);
+                            }
+                        }
+                        else if (currentSection == "GameSelectorFolders" || currentSection == "GameSelectorExclusions")
+                        {
+                            if (!string.IsNullOrWhiteSpace(trimmedLine))
+                            {
+                                if (currentSection == "GameSelectorFolders")
+                                    gameSelectorFolders.Add(trimmedLine);
+                                else
+                                    gameSelectorExclusions.Add(trimmedLine);
                             }
                         }
                         else if (trimmedLine.Contains("="))
@@ -160,6 +189,9 @@ ToggleHDR=1
                 settings["DesktopModeLaunchAlso"] = launchAlsoSettings.ContainsKey("DesktopModeLaunchAlso")
                     ? launchAlsoSettings["DesktopModeLaunchAlso"].ToDictionary(path => path, _ => true)
                     : new Dictionary<string, bool>();
+                // Store game selector folders and exclusions in settings
+                settings["GameSelectorFolders"] = gameSelectorFolders.ToDictionary(folder => folder, _ => true);
+                settings["GameSelectorExclusions"] = gameSelectorExclusions.ToDictionary(exclusion => exclusion, _ => true);
             }
             catch (Exception ex)
             {
@@ -263,18 +295,29 @@ ToggleHDR=1
         {
             try
             {
-                // Define paths to search for game shortcuts
-                string[] paths = new[]
-                {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Start Menu\Programs\Steam"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), @"Programs\Steam"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Start Menu\Programs\Call of Duty"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), @"Programs\Call of Duty"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Start Menu\Programs\Games"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), @"Programs\Games")
-                };
+                // Read INI settings
+                var settings = ReadIniFile();
+                var gameSelectorFolders = settings.ContainsKey("GameSelectorFolders")
+                    ? settings["GameSelectorFolders"].Keys.ToList()
+                    : new List<string>();
+                var gameSelectorExclusions = settings.ContainsKey("GameSelectorExclusions")
+                    ? settings["GameSelectorExclusions"].Keys.ToList()
+                    : new List<string>();
 
-                // Collect game shortcuts, excluding "Steam" and "Steam Support Center"
+                // Define base paths for Common and User Start Menus
+                string commonStartMenu = Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu);
+                string userStartMenu = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+                // Build list of folders to search
+                var paths = new List<string>();
+                foreach (string folder in gameSelectorFolders)
+                {
+                    // Add paths for both Common and User Start Menus
+                    paths.Add(Path.Combine(commonStartMenu, "Programs", folder));
+                    paths.Add(Path.Combine(userStartMenu, @"Microsoft\Windows\Start Menu\Programs", folder));
+                }
+
+                // Collect game shortcuts, excluding specified exclusions
                 var games = paths
                     .Where(Directory.Exists)
                     .SelectMany(path => Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
@@ -283,7 +326,7 @@ ToggleHDR=1
                         BaseName = Path.GetFileNameWithoutExtension(file),
                         FullName = file
                     })
-                    .Where(g => g.BaseName != "Steam" && g.BaseName != "Steam Support Center")
+                    .Where(g => !gameSelectorExclusions.Contains(g.BaseName, StringComparer.OrdinalIgnoreCase))
                     .Select(g => new
                     {
                         g.BaseName,
