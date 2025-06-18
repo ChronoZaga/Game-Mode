@@ -92,9 +92,9 @@ ToggleHDR=1
 ;C:\Program Files\WindowsApps\NVIDIACorp.NVIDIAControlPanel_8.1.968.0_x64__56jybvy8sckqj\nvcplui.exe
 
 [GameSelectorFolders]
-Steam
 Call of Duty
 Games
+Steam
 
 [GameSelectorExclusions]
 Steam
@@ -103,10 +103,19 @@ Steam Support Center
 
                 File.WriteAllText(iniPath, iniContent);
                 Debug.WriteLine($"Created INI file: {iniPath}");
+
+                // Verify the file was created
+                if (!File.Exists(iniPath))
+                {
+                    MessageBox.Show($"Failed to create INI file at {iniPath}. The application will now close. Try running as Admin once.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Environment.Exit(0);
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to create INI file: {ex.Message}");
+                MessageBox.Show($"Failed to create INI file at {iniPath}: {ex.Message} The application will now close. Try running as Admin once.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Environment.Exit(0);
             }
         }
 
