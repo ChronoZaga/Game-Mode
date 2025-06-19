@@ -743,5 +743,32 @@ Steam Support Center
                 Debug.WriteLine($"BtnToggleHDR_Click failed: {ex.Message}");
             }
         }
+
+        private void BtnSettings_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (File.Exists(iniPath))
+                {
+                    ProcessStartInfo startInfo = new ProcessStartInfo
+                    {
+                        FileName = "notepad.exe",
+                        Arguments = $"\"{iniPath}\"",
+                        UseShellExecute = true,
+                        Verb = "runas" // Run as admin
+                    };
+                    Process.Start(startInfo);
+                    Debug.WriteLine($"Opened INI file in Notepad: {iniPath}");
+                }
+                else
+                {
+                    Debug.WriteLine($"INI file not found: {iniPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to open INI file in Notepad: {ex.Message}");
+            }
+        }
     }
 }

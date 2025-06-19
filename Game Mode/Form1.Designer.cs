@@ -34,6 +34,7 @@ namespace Game_Mode
             this.btnGameMode = new System.Windows.Forms.Button();
             this.btnDesktopMode = new System.Windows.Forms.Button();
             this.btnToggleHDR = new System.Windows.Forms.Button();
+            this.btnSettings = new System.Windows.Forms.Button();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.SuspendLayout();
             // 
@@ -76,6 +77,23 @@ namespace Game_Mode
             this.btnToggleHDR.Click += new System.EventHandler(this.BtnToggleHDR_Click);
             this.toolTip.SetToolTip(this.btnToggleHDR, "Toggle HDR");
             // 
+            // btnSettings
+            // 
+            this.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSettings.FlatAppearance.BorderSize = 0;
+            this.btnSettings.FlatAppearance.MouseOverBackColor = System.Drawing.Color.Transparent;
+            this.btnSettings.FlatAppearance.MouseDownBackColor = System.Drawing.Color.Transparent;
+            this.btnSettings.Location = new System.Drawing.Point(254, 161);
+            this.btnSettings.Name = "btnSettings";
+            this.btnSettings.Size = new System.Drawing.Size(30, 30);
+            this.btnSettings.TabIndex = 3;
+            this.btnSettings.Text = "";
+            this.btnSettings.UseVisualStyleBackColor = true;
+            this.btnSettings.Image = LoadSystemIconAsBitmap(@"C:\Windows\System32\wmploc.dll", 17, 16, 16); // Gear icon
+            this.btnSettings.ImageAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
+            this.toolTip.SetToolTip(this.btnSettings, "Settings");
+            // 
             // toolTip
             // 
             this.toolTip.AutoPopDelay = 5000;
@@ -87,6 +105,7 @@ namespace Game_Mode
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(284, 191); // Increased height to accommodate new button
+            this.Controls.Add(this.btnSettings);
             this.Controls.Add(this.btnToggleHDR);
             this.Controls.Add(this.btnDesktopMode);
             this.Controls.Add(this.btnGameMode);
@@ -103,6 +122,7 @@ namespace Game_Mode
         private System.Windows.Forms.Button btnGameMode;
         private System.Windows.Forms.Button btnDesktopMode;
         private System.Windows.Forms.Button btnToggleHDR;
+        private System.Windows.Forms.Button btnSettings;
         private System.Windows.Forms.ToolTip toolTip;
 
         private System.Drawing.Bitmap LoadIcoAsBitmap(string resourceName, int targetWidth, int targetHeight)
