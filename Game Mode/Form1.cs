@@ -63,7 +63,10 @@ namespace Game_Mode
             try
             {
                 // Define default INI content with steps ordered by execution
-                string iniContent = @"[GameMode]
+                string iniContent = @";Created by ChronoZaga
+;https://github.com/ChronoZaga/Game-Mode/releases
+
+[GameMode]
 SetButtonColors=1
 LaunchGameSelector=1
 SetPowerPlan=1

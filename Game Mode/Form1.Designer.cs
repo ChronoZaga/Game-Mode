@@ -89,7 +89,7 @@ namespace Game_Mode
             this.btnSettings.TabIndex = 3;
             this.btnSettings.Text = "";
             this.btnSettings.UseVisualStyleBackColor = true;
-            this.btnSettings.Image = LoadSystemIconAsBitmap(@"C:\Windows\System32\wmploc.dll", 17, 16, 16); // Gear icon
+            this.btnSettings.Image = LoadIcoAsBitmap("Game_Mode.settings.ico", 16, 16); // Changed to embedded resource
             this.btnSettings.ImageAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
             this.toolTip.SetToolTip(this.btnSettings, "Settings");

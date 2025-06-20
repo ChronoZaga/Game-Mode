@@ -115,5 +115,8 @@
   <ItemGroup>
     <EmbeddedResource Include="gamemode.wav" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="settings.ico" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
