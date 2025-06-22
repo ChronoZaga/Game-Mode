@@ -49,10 +49,42 @@ namespace Game_Mode
             }
 
             // Initialize INI file path (same directory as executable)
-            iniPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Game_Mode.ini");
+            iniPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "GameMode.ini");
 
             // Create INI file if it doesn't exist
             CreateIniFileIfNotExists();
+
+            // Extract DVChange.exe to the executable's directory if it doesn't exist
+            try
+            {
+                Assembly assembly = Assembly.GetExecutingAssembly();
+                string resourceName = "Game_Mode.DVChange.exe";
+                string exeDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                string dvChangePath = Path.Combine(exeDirectory, "DVChange.exe");
+
+                if (!File.Exists(dvChangePath))
+                {
+                    using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
+                    {
+                        if (resourceStream == null)
+                        {
+                            Debug.WriteLine("DVChange.exe resource not found");
+                            return;
+                        }
+
+                        // Extract the resource to the executable's directory
+                        using (FileStream fileStream = new FileStream(dvChangePath, FileMode.Create, FileAccess.Write))
+                        {
+                            resourceStream.CopyTo(fileStream);
+                        }
+                        Debug.WriteLine($"Extracted DVChange.exe to: {dvChangePath}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to extract DVChange.exe: {ex.Message}");
+            }
         }
 
         private void CreateIniFileIfNotExists()
@@ -102,6 +134,7 @@ Steam
 [GameSelectorExclusions]
 Steam
 Steam Support Center
+3DMark
 ";
 
                 File.WriteAllText(iniPath, iniContent);
@@ -261,41 +294,28 @@ Steam Support Center
         {
             try
             {
-                // Get the embedded DVChange.exe resource
-                Assembly assembly = Assembly.GetExecutingAssembly();
-                string resourceName = "Game_Mode.DVChange.exe";
-                using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
+                // Define the path for DVChange.exe alongside the executable
+                string exeDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                string dvChangePath = Path.Combine(exeDirectory, "DVChange.exe");
+
+                // Check if DVChange.exe exists
+                if (!File.Exists(dvChangePath))
                 {
-                    if (resourceStream == null)
-                    {
-                        Debug.WriteLine("DVChange.exe resource not found");
-                        return;
-                    }
-
-                    // Create a temporary file path
-                    string tempPath = Path.Combine(Path.GetTempPath(), "DVChange.exe");
-
-                    // Extract the resource to the temp file
-                    using (FileStream fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
-                    {
-                        resourceStream.CopyTo(fileStream);
-                    }
-
-                    // Run the extracted executable
-                    ProcessStartInfo startInfo = new ProcessStartInfo
-                    {
-                        FileName = tempPath,
-                        Arguments = argument,
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        WindowStyle = ProcessWindowStyle.Hidden
-                    };
-                    Process process = Process.Start(startInfo);
-                    process.WaitForExit(); // Ensure command completes
-
-                    // Clean up the temp file
-                    File.Delete(tempPath);
+                    Debug.WriteLine($"DVChange.exe not found at {dvChangePath}");
+                    return;
                 }
+
+                // Run the DVChange.exe
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    FileName = dvChangePath,
+                    Arguments = argument,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+                Process process = Process.Start(startInfo);
+                process.WaitForExit(); // Ensure command completes
             }
             catch (Exception ex)
             {
