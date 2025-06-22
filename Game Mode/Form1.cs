@@ -20,6 +20,56 @@ namespace Game_Mode
         [DllImport("winmm.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern bool PlaySound(string pszSound, IntPtr hmod, uint fdwSound);
 
+        // NVAPI P/Invoke declarations
+        [DllImport("nvapi64.dll", EntryPoint = "nvapi_QueryInterface", CallingConvention = CallingConvention.Cdecl, PreserveSig = true)]
+        private static extern IntPtr nvapi_QueryInterface(uint offset);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr LoadLibrary(string lpFileName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool FreeLibrary(IntPtr hModule);
+
+        // Import FormatMessage for error details
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern uint FormatMessage(uint dwFlags, IntPtr lpSource, uint dwMessageId, uint dwLanguageId, [Out] char[] lpBuffer, uint nSize, IntPtr Arguments);
+
+        private const uint FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100;
+        private const uint FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000;
+        private const uint FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int NvAPI_InitializeDelegate();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int NvAPI_EnumNvidiaDisplayHandleDelegate(uint thisEnum, out IntPtr displayHandle);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int NvAPI_SetDVCLevelDelegate(IntPtr displayHandle, uint outputId, uint level);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int NvAPI_GetDVCInfoDelegate(IntPtr displayHandle, uint outputId, ref NV_DISPLAY_DVC_INFO dvcInfo);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NV_DISPLAY_DVC_INFO
+        {
+            public uint version;
+            public uint currentLevel;
+            public uint minLevel;
+            public uint maxLevel;
+        }
+
+        private const uint NV_DISPLAY_DVC_INFO_VER = (uint)(16 | (1 << 16)); // sizeof(NV_DISPLAY_DVC_INFO) | version
+        private const uint NVAPI_MAX_PHYSICAL_GPUS = 64;
+        private const uint NVAPI_MAX_DISPLAY_HEADS = 2;
+
+        private static IntPtr nvapiHandle = IntPtr.Zero;
+        private static IntPtr NvAPI_Initialize = IntPtr.Zero;
+        private static IntPtr NvAPI_EnumNvidiaDisplayHandle = IntPtr.Zero;
+        private static IntPtr NvAPI_SetDVCLevel = IntPtr.Zero;
+        private static IntPtr NvAPI_GetDVCInfo = IntPtr.Zero;
+        private static bool nvapiInitialized = false;
+
         // Sound flags
         private const uint SND_FILENAME = 0x00020000;
         private const uint SND_ASYNC = 0x0001;
@@ -54,36 +104,181 @@ namespace Game_Mode
             // Create INI file if it doesn't exist
             CreateIniFileIfNotExists();
 
-            // Extract DVChange.exe to the executable's directory if it doesn't exist
+            // Initialize NVAPI
+            InitializeNVAPI();
+
+            // Register form closed event for cleanup
+            this.FormClosed += Form1_FormClosed;
+        }
+
+        private string GetWin32ErrorMessage(int errorCode)
+        {
+            char[] buffer = new char[256];
+            uint result = FormatMessage(
+                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                IntPtr.Zero,
+                (uint)errorCode,
+                0, // Default language
+                buffer,
+                (uint)buffer.Length,
+                IntPtr.Zero);
+            if (result != 0)
+            {
+                return new string(buffer, 0, (int)result).Trim();
+            }
+            return $"Unknown error (code {errorCode})";
+        }
+
+        private void InitializeNVAPI()
+        {
+            string errorMessage = null;
             try
             {
-                Assembly assembly = Assembly.GetExecutingAssembly();
-                string resourceName = "Game_Mode.DVChange.exe";
-                string exeDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                string dvChangePath = Path.Combine(exeDirectory, "DVChange.exe");
-
-                if (!File.Exists(dvChangePath))
+                // Load nvapi64.dll from System32 for x64
+                string system32Path = @"C:\Windows\System32";
+                string nvapi64Path = Path.Combine(system32Path, "nvapi64.dll");
+                nvapiHandle = LoadLibrary(nvapi64Path);
+                if (nvapiHandle == IntPtr.Zero)
                 {
-                    using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
-                    {
-                        if (resourceStream == null)
-                        {
-                            Debug.WriteLine("DVChange.exe resource not found");
-                            return;
-                        }
+                    int errorCode = Marshal.GetLastWin32Error();
+                    errorMessage = $"Failed to load {nvapi64Path}: Error {errorCode} - {GetWin32ErrorMessage(errorCode)}";
+                    Debug.WriteLine(errorMessage);
+                    return;
+                }
+                Debug.WriteLine($"Loaded {nvapi64Path}, Handle: {nvapiHandle}");
 
-                        // Extract the resource to the executable's directory
-                        using (FileStream fileStream = new FileStream(dvChangePath, FileMode.Create, FileAccess.Write))
-                        {
-                            resourceStream.CopyTo(fileStream);
-                        }
-                        Debug.WriteLine($"Extracted DVChange.exe to: {dvChangePath}");
+                // Get NVAPI function pointers
+                NvAPI_Initialize = nvapi_QueryInterface(0x0150E828); // NvAPI_Initialize
+                NvAPI_EnumNvidiaDisplayHandle = nvapi_QueryInterface(0x9ABDD40D); // NvAPI_EnumNvidiaDisplayHandle
+                NvAPI_SetDVCLevel = nvapi_QueryInterface(0x172409B4); // NvAPI_SetDVCLevel
+                NvAPI_GetDVCInfo = nvapi_QueryInterface(0x4085DE45); // NvAPI_GetDVCInfo
+
+                Debug.WriteLine($"Function pointers: Initialize={NvAPI_Initialize}, EnumDisplay={NvAPI_EnumNvidiaDisplayHandle}, SetDVC={NvAPI_SetDVCLevel}, GetDVC={NvAPI_GetDVCInfo}");
+                if (NvAPI_Initialize == IntPtr.Zero || NvAPI_EnumNvidiaDisplayHandle == IntPtr.Zero ||
+                    NvAPI_SetDVCLevel == IntPtr.Zero || NvAPI_GetDVCInfo == IntPtr.Zero)
+                {
+                    errorMessage = $"Failed to retrieve NVAPI function pointers: Initialize={NvAPI_Initialize}, EnumDisplay={NvAPI_EnumNvidiaDisplayHandle}, SetDVC={NvAPI_SetDVCLevel}, GetDVC={NvAPI_GetDVCInfo}";
+                    Debug.WriteLine(errorMessage);
+                    FreeLibrary(nvapiHandle);
+                    nvapiHandle = IntPtr.Zero;
+                    return;
+                }
+
+                // Initialize NVAPI
+                var initializeDelegate = Marshal.GetDelegateForFunctionPointer<NvAPI_InitializeDelegate>(NvAPI_Initialize);
+                int status = initializeDelegate();
+                Debug.WriteLine($"NvAPI_Initialize: Status {status}");
+                if (status == 0) // NVAPI_OK
+                {
+                    nvapiInitialized = true;
+                    Debug.WriteLine("NVAPI initialized successfully.");
+                }
+                else
+                {
+                    errorMessage = $"NVAPI initialization failed: Status {status} (0=OK, -1=Error, -3=NotSupported)";
+                    Debug.WriteLine(errorMessage);
+                    FreeLibrary(nvapiHandle);
+                    nvapiHandle = IntPtr.Zero;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Failed to initialize NVAPI: {ex.Message}";
+                Debug.WriteLine(errorMessage);
+            }
+
+            if (!nvapiInitialized && errorMessage != null)
+            {
+                MessageBox.Show(errorMessage + "\nEnsure NVIDIA drivers are installed and up-to-date.", "NVAPI Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            if (nvapiHandle != IntPtr.Zero)
+            {
+                FreeLibrary(nvapiHandle);
+                nvapiHandle = IntPtr.Zero;
+                Debug.WriteLine("Freed nvapi64.dll handle.");
+            }
+        }
+
+        private void SetDigitalVibrance(string argument)
+        {
+            if (!nvapiInitialized)
+            {
+                Debug.WriteLine("NVAPI not initialized, cannot set Digital Vibrance.");
+                MessageBox.Show("Unable to set Digital Vibrance: NVAPI not initialized. Ensure NVIDIA drivers are installed.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Parse argument (same as DVChange: 0-63)
+                uint dvcValue;
+                if (!uint.TryParse(argument, out dvcValue))
+                {
+                    Debug.WriteLine($"Invalid Digital Vibrance argument: {argument}");
+                    return;
+                }
+
+                // Clamp value to 0-63, as per DVChange
+                if (dvcValue > 63) dvcValue = 63;
+                if (dvcValue < 0) dvcValue = 0;
+
+                // Enumerate displays
+                var enumDisplayDelegate = Marshal.GetDelegateForFunctionPointer<NvAPI_EnumNvidiaDisplayHandleDelegate>(NvAPI_EnumNvidiaDisplayHandle);
+                var setDVCDelegate = Marshal.GetDelegateForFunctionPointer<NvAPI_SetDVCLevelDelegate>(NvAPI_SetDVCLevel);
+                var getDVCDelegate = Marshal.GetDelegateForFunctionPointer<NvAPI_GetDVCInfoDelegate>(NvAPI_GetDVCInfo);
+
+                IntPtr[] displayHandles = new IntPtr[NVAPI_MAX_PHYSICAL_GPUS * NVAPI_MAX_DISPLAY_HEADS];
+                uint displayCount = 0;
+                int status;
+                for (uint i = 0; ; i++)
+                {
+                    IntPtr displayHandle;
+                    status = enumDisplayDelegate(i, out displayHandle);
+                    Debug.WriteLine($"EnumNvidiaDisplayHandle({i}): Status {status}, Handle {displayHandle}");
+                    if (status != 0) // NVAPI_OK = 0
+                        break;
+                    displayHandles[displayCount++] = displayHandle;
+                }
+
+                if (displayCount == 0)
+                {
+                    Debug.WriteLine($"No NVIDIA displays found: Status {status}");
+                    MessageBox.Show("Unable to set Digital Vibrance: No NVIDIA displays detected.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Set and verify Digital Vibrance for each display
+                NV_DISPLAY_DVC_INFO dvcInfo = new NV_DISPLAY_DVC_INFO { version = NV_DISPLAY_DVC_INFO_VER };
+                for (uint i = 0; i < displayCount; i++)
+                {
+                    // Set DVC level
+                    status = setDVCDelegate(displayHandles[i], 0, dvcValue);
+                    Debug.WriteLine($"SetDVCLevel(Display {i}, Value {dvcValue}): Status {status}");
+                    if (status != 0)
+                    {
+                        Debug.WriteLine($"Failed to set Digital Vibrance for display {i}: Status {status}");
+                        continue;
+                    }
+
+                    // Verify DVC level
+                    status = getDVCDelegate(displayHandles[i], 0, ref dvcInfo);
+                    if (status == 0)
+                    {
+                        Debug.WriteLine($"Display {i}: Set Digital Vibrance to {dvcInfo.currentLevel} (argument {argument})");
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"Failed to get Digital Vibrance for display {i}: Status {status}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to extract DVChange.exe: {ex.Message}");
+                Debug.WriteLine($"Failed to set Digital Vibrance: {ex.Message}");
             }
         }
 
@@ -132,9 +327,9 @@ Games
 Steam
 
 [GameSelectorExclusions]
+;3DMark
 Steam
 Steam Support Center
-3DMark
 ";
 
                 File.WriteAllText(iniPath, iniContent);
@@ -288,39 +483,6 @@ Steam Support Center
             keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0); // Alt up
             keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0); // Win up
             System.Threading.Thread.Sleep(50);         // Brief delay to ensure toggle completes
-        }
-
-        private void RunEmbeddedDVChange(string argument)
-        {
-            try
-            {
-                // Define the path for DVChange.exe alongside the executable
-                string exeDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                string dvChangePath = Path.Combine(exeDirectory, "DVChange.exe");
-
-                // Check if DVChange.exe exists
-                if (!File.Exists(dvChangePath))
-                {
-                    Debug.WriteLine($"DVChange.exe not found at {dvChangePath}");
-                    return;
-                }
-
-                // Run the DVChange.exe
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = dvChangePath,
-                    Arguments = argument,
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                Process process = Process.Start(startInfo);
-                process.WaitForExit(); // Ensure command completes
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"RunEmbeddedDVChange failed: {ex.Message}");
-            }
         }
 
         private void LaunchGameSelector()
@@ -519,13 +681,13 @@ Steam Support Center
                     Process.Start(powerPlanInfo);
                 }
 
-                // Set NVIDIA Digital Vibrance to 60% (argument 12) using embedded DVChange
+                // Set NVIDIA Digital Vibrance to 60% (argument 12) using NVAPI
                 bool setDigitalVibrance;
                 if (!gameModeSettings.TryGetValue("SetDigitalVibrance", out setDigitalVibrance))
                     setDigitalVibrance = true;
                 if (setDigitalVibrance)
                 {
-                    RunEmbeddedDVChange("12");
+                    SetDigitalVibrance("12");
                 }
 
                 // Simulate 50 volume up key presses
@@ -690,13 +852,13 @@ Steam Support Center
                     Process.Start(startInfo);
                 }
 
-                // Set NVIDIA Digital Vibrance to 50% (argument 0) using embedded DVChange
+                // Set NVIDIA Digital Vibrance to 50% (argument 0) using NVAPI
                 bool setDigitalVibrance;
                 if (!desktopModeSettings.TryGetValue("SetDigitalVibrance", out setDigitalVibrance))
                     setDigitalVibrance = true;
                 if (setDigitalVibrance)
                 {
-                    RunEmbeddedDVChange("0");
+                    SetDigitalVibrance("0");
                 }
 
                 // Simulate 50 volume down key presses

@@ -106,9 +106,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="DVChange.exe" />
-  </ItemGroup>
-  <ItemGroup>
     <EmbeddedResource Include="desktop.ico" />
     <EmbeddedResource Include="game.ico" />
   </ItemGroup>
