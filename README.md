@@ -9,13 +9,13 @@ When the "Game Mode" button is pushed it...
 
 -Sets high performance power plan
 
--Sets Nvidia digital vibrance to 60% (Using embedded DVChange.exe by eXist73)
+-Sets Nvidia digital vibrance to 60%
 
 -Turns the sound volume up to 100% (with "volume up" virtual keyboard button presses)
 
 -Toggles HDR On (with "win+alt+B" virtual keyboard button presses)
 
--Launches any program listed in the INI file
+-Launches any program user listed in the INI file
 
 -Plays a sound to verify speakers/headphones are working
 ___________________________________________________________________________________________________________________
@@ -24,7 +24,7 @@ When the "Desktop Mode" button is pushed it...
 
 -Sets balanced power plan
 
--Sets Nvidia digital vibrance back to the default of 50% (Using embedded DVChange.exe by eXist73)
+-Sets Nvidia digital vibrance back to the default of 50%
 
 -Turns the sound volume down to 0%/Muted (with "volume down" virtual keyboard button presses)
 
