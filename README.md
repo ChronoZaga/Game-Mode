@@ -5,7 +5,7 @@ ________________________________________________________________________________
 
 When the "Game Mode" button is pushed it...
 
--Launches a custom Game Selector (which will launch any game listed in the Steam, Games, or Call of Duty Start Menu folders)
+-Launches a custom Game Launcher (which will launch any game listed in the Steam, Games, or Call of Duty Start Menu folders)
 
 -Sets high performance power plan
 
