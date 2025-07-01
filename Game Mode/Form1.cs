@@ -365,6 +365,13 @@ Steam Support Center
             System.Threading.Thread.Sleep(50);         // Brief delay to ensure toggle completes
         }
 
+        private string RemoveTrademarkSymbols(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+            return input.Replace("\u2122", "").Replace("\u00AE", "");
+        }
+
         private void LaunchGameSelector()
         {
             // Read INI settings
@@ -395,7 +402,7 @@ Steam Support Center
                 .SelectMany(path => Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                 .Select(file => new
                 {
-                    BaseName = Path.GetFileNameWithoutExtension(file),
+                    BaseName = RemoveTrademarkSymbols(Path.GetFileNameWithoutExtension(file)),
                     FullName = file
                 })
                 .Where(g => !gameSelectorExclusions.Contains(g.BaseName, StringComparer.OrdinalIgnoreCase))
@@ -425,6 +432,7 @@ Steam Support Center
             var screen = Screen.PrimaryScreen.WorkingArea;
             selectorForm.Location = new System.Drawing.Point(screen.Width - selectorForm.Width, 0);
             selectorForm.FormBorderStyle = FormBorderStyle.FixedSingle;
+            selectorForm.Opacity = 0.98;
             selectorForm.MaximizeBox = false;
             selectorForm.MinimizeBox = false;
 

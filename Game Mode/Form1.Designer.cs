@@ -37,6 +37,7 @@ namespace Game_Mode
             this.btnSettings = new System.Windows.Forms.Button();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.SuspendLayout();
+            //this.BackColor = System.Drawing.Color.Gray;
             // 
             // btnGameMode
             // 
