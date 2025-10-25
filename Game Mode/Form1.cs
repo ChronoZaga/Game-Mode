@@ -207,14 +207,14 @@ ToggleHDR=1
 [GameModeLaunchAlso]
 ;C:\Path\To\Example1.exe
 ;C:\Path\To\Example2.exe
+;C:\Program Files\Game Mode\GM.bat
 ;C:\Program Files\Cheat Happens Aurora\Aurora.exe
-;C:\Program Files\WindowsApps\NVIDIACorp.NVIDIAControlPanel_8.1.968.0_x64__56jybvy8sckqj\nvcplui.exe
 ;C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe
 
 [DesktopModeLaunchAlso]
 ;C:\Path\To\Example3.exe
 ;C:\Path\To\Example4.exe
-;C:\Program Files\WindowsApps\NVIDIACorp.NVIDIAControlPanel_8.1.968.0_x64__56jybvy8sckqj\nvcplui.exe
+;C:\Program Files\Game Mode\DM.bat
 
 [VibranceSettings]
 GameVibe=12
