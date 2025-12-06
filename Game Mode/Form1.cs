@@ -216,6 +216,15 @@ ToggleHDR=1
 ;C:\Path\To\Example4.exe
 ;C:\Program Files\Game Mode\DM.bat
 
+[GameModeKillAlso]
+;Process names or full paths to EXE to terminate when entering Game Mode
+;discord.exe
+;C:\Program Files\Example\example.exe
+
+[DesktopModeKillAlso]
+;Process names or full paths to EXE to terminate when entering Desktop Mode
+;someBackgroundApp.exe
+
 [VibranceSettings]
 GameVibe=12
 DeskVibe=0
@@ -270,7 +279,7 @@ Steam Support Center
                 if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
                 {
                     currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
-                    if (currentSection == "GameModeLaunchAlso" || currentSection == "DesktopModeLaunchAlso")
+                    if (currentSection == "GameModeLaunchAlso" || currentSection == "DesktopModeLaunchAlso" || currentSection == "GameModeKillAlso" || currentSection == "DesktopModeKillAlso")
                     {
                         launchAlsoSettings[currentSection] = new List<string>();
                     }
@@ -288,7 +297,7 @@ Steam Support Center
                 }
                 else if (currentSection != null)
                 {
-                    if (currentSection == "GameModeLaunchAlso" || currentSection == "DesktopModeLaunchAlso")
+                    if (currentSection == "GameModeLaunchAlso" || currentSection == "DesktopModeLaunchAlso" || currentSection == "GameModeKillAlso" || currentSection == "DesktopModeKillAlso")
                     {
                         if (!string.IsNullOrWhiteSpace(trimmedLine))
                         {
@@ -321,6 +330,13 @@ Steam Support Center
                 : new Dictionary<string, string>();
             settings["DesktopModeLaunchAlso"] = launchAlsoSettings.ContainsKey("DesktopModeLaunchAlso")
                 ? launchAlsoSettings["DesktopModeLaunchAlso"].ToDictionary(path => path, _ => "1")
+                : new Dictionary<string, string>();
+            // Store kill lists
+            settings["GameModeKillAlso"] = launchAlsoSettings.ContainsKey("GameModeKillAlso")
+                ? launchAlsoSettings["GameModeKillAlso"].ToDictionary(path => path, _ => "1")
+                : new Dictionary<string, string>();
+            settings["DesktopModeKillAlso"] = launchAlsoSettings.ContainsKey("DesktopModeKillAlso")
+                ? launchAlsoSettings["DesktopModeKillAlso"].ToDictionary(path => path, _ => "1")
                 : new Dictionary<string, string>();
             // Store game selector folders and exclusions in settings
             settings["GameSelectorFolders"] = gameSelectorFolders.ToDictionary(folder => folder, _ => "1");
@@ -370,6 +386,87 @@ Steam Support Center
             if (string.IsNullOrEmpty(input))
                 return input;
             return input.Replace("\u2122", "").Replace("\u00AE", "");
+        }
+
+        // Kill processes specified in the INI (section keys are the process names or full paths)
+        private void KillProcessesFromSettings(Dictionary<string, Dictionary<string, string>> settings, string sectionKey)
+        {
+            if (settings == null || !settings.ContainsKey(sectionKey))
+                return;
+
+            foreach (var rawEntry in settings[sectionKey].Keys)
+            {
+                if (string.IsNullOrWhiteSpace(rawEntry))
+                    continue;
+
+                string entry = rawEntry.Trim().Trim('"');
+
+                // If entry looks like a path, extract filename
+                string imageName = entry;
+                if (entry.IndexOfAny(new[] { '\\', ':' }) >= 0)
+                {
+                    imageName = Path.GetFileName(entry);
+                }
+
+                // Ensure we have a file name
+                if (string.IsNullOrWhiteSpace(imageName))
+                    continue;
+
+                // Derive process name without extension for Process.GetProcessesByName
+                string procName = Path.GetFileNameWithoutExtension(imageName);
+
+                try
+                {
+                    bool anyKilled = false;
+
+                    // Try to find running processes by name and kill them
+                    try
+                    {
+                        var processes = Process.GetProcessesByName(procName);
+                        foreach (var p in processes)
+                        {
+                            try
+                            {
+                                p.Kill();
+                                anyKilled = true;
+                            }
+                            catch
+                            {
+                                // ignore individual failures
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // ignore enumeration errors
+                    }
+
+                    // If none matched, fallback to taskkill (/IM expects the image name, including extension)
+                    if (!anyKilled)
+                    {
+                        try
+                        {
+                            ProcessStartInfo psi = new ProcessStartInfo
+                            {
+                                FileName = "taskkill",
+                                Arguments = $"/IM \"{imageName}\" /F",
+                                CreateNoWindow = true,
+                                UseShellExecute = false,
+                                WindowStyle = ProcessWindowStyle.Hidden
+                            };
+                            Process.Start(psi);
+                        }
+                        catch
+                        {
+                            // ignore taskkill failures
+                        }
+                    }
+                }
+                catch
+                {
+                    // swallow any unexpected exceptions to avoid interrupting mode switching
+                }
+            }
         }
 
         private void LaunchGameSelector()
@@ -515,6 +612,9 @@ Steam Support Center
                 btnDesktopMode.BackColor = System.Drawing.SystemColors.Control;
             }
 
+            // Kill tasks specified in GameModeKillAlso INI section
+            KillProcessesFromSettings(settings, "GameModeKillAlso");
+
             // Launch game selector
             bool launchGameSelector;
             if (!gameModeSettings.TryGetValue("LaunchGameSelector", out string launchGameSelectorValue) || !bool.TryParse(launchGameSelectorValue, out launchGameSelector))
@@ -644,6 +744,9 @@ Steam Support Center
                 btnDesktopMode.BackColor = GetWindowsAccentColor();
                 btnGameMode.BackColor = System.Drawing.SystemColors.Control;
             }
+
+            // Kill tasks specified in DesktopModeKillAlso INI section
+            KillProcessesFromSettings(settings, "DesktopModeKillAlso");
 
             // Set balanced power plan silently
             bool setPowerPlan;
