@@ -113,7 +113,7 @@ namespace Game_Mode
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.Name = "Form1";
-            this.Opacity = 0.98; // Set transparency percentage
+            this.Opacity = 0.50; // Set transparency percentage
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Game Mode";
             this.ResumeLayout(false);

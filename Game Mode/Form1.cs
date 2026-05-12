@@ -529,7 +529,7 @@ Steam Support Center
             var screen = Screen.PrimaryScreen.WorkingArea;
             selectorForm.Location = new System.Drawing.Point(screen.Width - selectorForm.Width, 0);
             selectorForm.FormBorderStyle = FormBorderStyle.FixedSingle;
-            selectorForm.Opacity = 0.98;
+            selectorForm.Opacity = 0.50;
             selectorForm.MaximizeBox = false;
             selectorForm.MinimizeBox = false;
 
