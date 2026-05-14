@@ -20,6 +20,15 @@ namespace Game_Mode
         [DllImport("winmm.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern bool PlaySound(string pszSound, IntPtr hmod, uint fdwSound);
 
+        // DWM titlebar text color
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        private const int DWMWA_TEXT_COLOR = 36;
+
+        // Hide titlebar icon only
+        private const int WS_EX_DLGMODALFRAME = 0x00000001;
+
         // NVAPI P/Invoke declarations
         [DllImport("nvapi64.dll", EntryPoint = "nvapi_QueryInterface", CallingConvention = CallingConvention.Cdecl, PreserveSig = true)]
         private static extern IntPtr nvapi_QueryInterface(uint offset);
@@ -76,9 +85,22 @@ namespace Game_Mode
 
         private readonly string iniPath;
 
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_DLGMODALFRAME;
+                return cp;
+            }
+        }
+
         public Form1()
         {
             InitializeComponent();
+
+            // Make titlebar text match the titlebar color
+            ApplyTitleBarTextColor();
 
             // Set the form icon to the gamepad icon from joy.cpl
             this.Icon = System.Drawing.Icon.ExtractAssociatedIcon(@"C:\Windows\System32\joy.cpl");
@@ -94,6 +116,12 @@ namespace Game_Mode
 
             // Register form closed event for cleanup
             this.FormClosed += Form1_FormClosed;
+        }
+
+        private void ApplyTitleBarTextColor()
+        {
+            int titleTextColor = System.Drawing.ColorTranslator.ToWin32(System.Drawing.Color.White);
+            DwmSetWindowAttribute(this.Handle, DWMWA_TEXT_COLOR, ref titleTextColor, sizeof(int));
         }
 
         private void InitializeNVAPI()
@@ -521,15 +549,19 @@ Steam Support Center
 
             // Create a new form for game selection
             Form selectorForm = new Form();
+            selectorForm.SuspendLayout();
+
             selectorForm.Icon = System.Drawing.Icon.ExtractAssociatedIcon(@"C:\Windows\System32\joy.cpl");
             selectorForm.Text = "Choose a Game";
             selectorForm.Size = new System.Drawing.Size(300, 400);
             selectorForm.StartPosition = FormStartPosition.Manual;
+
             // Position in upper right corner
             var screen = Screen.PrimaryScreen.WorkingArea;
             selectorForm.Location = new System.Drawing.Point(screen.Width - selectorForm.Width, 0);
+
             selectorForm.FormBorderStyle = FormBorderStyle.FixedSingle;
-            selectorForm.Opacity = 0.50;
+            selectorForm.Opacity = 0.0;
             selectorForm.MaximizeBox = false;
             selectorForm.MinimizeBox = false;
 
@@ -538,11 +570,14 @@ Steam Support Center
                 Dock = DockStyle.Fill,
                 SelectionMode = SelectionMode.One
             };
+
+            listBox.BeginUpdate();
             foreach (var game in games)
             {
                 listBox.Items.Add(new { Display = game.BaseName, Path = game.FullName });
             }
             listBox.DisplayMember = "Display";
+            listBox.EndUpdate();
 
             Button okButton = new Button
             {
@@ -577,10 +612,22 @@ Steam Support Center
             selectorForm.Controls.Add(okButton);
             selectorForm.Controls.Add(cancelButton);
 
+            selectorForm.ResumeLayout(false);
+            selectorForm.PerformLayout();
+
             // Ensure form is disposed when closed
             selectorForm.FormClosed += (s, e) => selectorForm.Dispose();
 
-            // Show the form modelessly (non-blocking)
+            selectorForm.Shown += (s, e) =>
+            {
+                selectorForm.Refresh();
+                listBox.Refresh();
+                okButton.Refresh();
+                cancelButton.Refresh();
+                selectorForm.Opacity = 0.50;
+            };
+
+            // Show the form modelessly after it is fully built, but invisible until first render completes
             selectorForm.Show();
         }
 

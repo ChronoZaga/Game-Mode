@@ -112,6 +112,9 @@ namespace Game_Mode
             this.Controls.Add(this.btnGameMode);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.ShowIcon = false;
+            this.ShowInTaskbar = true;
             this.Name = "Form1";
             this.Opacity = 0.50; // Set transparency percentage
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
