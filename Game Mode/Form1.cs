@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -556,12 +557,11 @@ Steam Support Center
             selectorForm.Size = new System.Drawing.Size(300, 400);
             selectorForm.StartPosition = FormStartPosition.Manual;
 
-            // Position in upper right corner
-            var screen = Screen.PrimaryScreen.WorkingArea;
-            selectorForm.Location = new System.Drawing.Point(screen.Width - selectorForm.Width, 0);
+            // Position off-screen first so any initial drawing is not visible
+            selectorForm.Location = new System.Drawing.Point(-10000, -10000);
 
             selectorForm.FormBorderStyle = FormBorderStyle.FixedSingle;
-            selectorForm.Opacity = 0.0;
+            selectorForm.Opacity = 0.50;
             selectorForm.MaximizeBox = false;
             selectorForm.MinimizeBox = false;
 
@@ -624,10 +624,13 @@ Steam Support Center
                 listBox.Refresh();
                 okButton.Refresh();
                 cancelButton.Refresh();
-                selectorForm.Opacity = 0.50;
+
+                // Move onscreen only after the first paint has already happened off-screen
+                var screen = Screen.PrimaryScreen.WorkingArea;
+                selectorForm.Location = new System.Drawing.Point(screen.Width - selectorForm.Width, 0);
             };
 
-            // Show the form modelessly after it is fully built, but invisible until first render completes
+            // Show the form modelessly after it is fully built
             selectorForm.Show();
         }
 
@@ -640,6 +643,44 @@ Steam Support Center
                 return string.Join(" ", words.Skip(1));
             }
             return baseName;
+        }
+
+        private void PlayGameModeSoundAsync()
+        {
+            Task.Run(() =>
+            {
+                System.Threading.Thread.Sleep(3500);
+                Assembly assembly = Assembly.GetExecutingAssembly();
+                string resourceName = "Game_Mode.gamemode.wav";
+                using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (resourceStream == null)
+                        return;
+
+                    // Create a temporary file path with a unique name
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"gamemode_{Guid.NewGuid()}.wav");
+
+                    // Extract the resource to the temp file
+                    using (FileStream fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                    {
+                        resourceStream.CopyTo(fileStream);
+                    }
+
+                    if (File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
+                    {
+                        PlaySound(tempPath, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
+
+                        // Delay to ensure sound playback releases the file
+                        System.Threading.Thread.Sleep(2000);
+
+                        // Clean up the temp file
+                        if (File.Exists(tempPath))
+                        {
+                            File.Delete(tempPath);
+                        }
+                    }
+                }
+            });
         }
 
         private void BtnGameMode_Click(object sender, EventArgs e)
@@ -735,43 +776,13 @@ Steam Support Center
                 }
             }
 
-            // Play embedded gamemode.wav after 3.5-second delay
+            // Play embedded gamemode.wav after 3.5-second delay without blocking the UI thread
             bool playSound;
             if (!gameModeSettings.TryGetValue("PlaySound", out string playSoundValue) || !bool.TryParse(playSoundValue, out playSound))
                 playSound = true;
             if (playSound)
             {
-                System.Threading.Thread.Sleep(3500);
-                Assembly assembly = Assembly.GetExecutingAssembly();
-                string resourceName = "Game_Mode.gamemode.wav";
-                using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
-                {
-                    if (resourceStream == null)
-                        return;
-
-                    // Create a temporary file path with a unique name
-                    string tempPath = Path.Combine(Path.GetTempPath(), $"gamemode_{Guid.NewGuid()}.wav");
-
-                    // Extract the resource to the temp file
-                    using (FileStream fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
-                    {
-                        resourceStream.CopyTo(fileStream);
-                    }
-
-                    if (File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
-                    {
-                        PlaySound(tempPath, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
-
-                        // Delay to ensure sound playback releases the file
-                        System.Threading.Thread.Sleep(2000);
-
-                        // Clean up the temp file
-                        if (File.Exists(tempPath))
-                        {
-                            File.Delete(tempPath);
-                        }
-                    }
-                }
+                PlayGameModeSoundAsync();
             }
         }
 
