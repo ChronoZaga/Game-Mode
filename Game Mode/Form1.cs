@@ -25,6 +25,7 @@ namespace Game_Mode
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
+        private const int DWMWA_CAPTION_COLOR = 35;
         private const int DWMWA_TEXT_COLOR = 36;
 
         // Hide titlebar icon only
@@ -102,6 +103,7 @@ namespace Game_Mode
 
             // Make titlebar text match the titlebar color
             ApplyTitleBarTextColor();
+            SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
 
             // Set the form icon to the gamepad icon from joy.cpl
             this.Icon = System.Drawing.Icon.ExtractAssociatedIcon(@"C:\Windows\System32\joy.cpl");
@@ -121,33 +123,81 @@ namespace Game_Mode
 
         private void ApplyTitleBarTextColor()
         {
-            int titleTextColor = System.Drawing.ColorTranslator.ToWin32(System.Drawing.Color.White);
-            DwmSetWindowAttribute(this.Handle, DWMWA_TEXT_COLOR, ref titleTextColor, sizeof(int));
+            // Pin the caption to its current color (so it doesn't change when the window is inactive),
+            // then paint the title text in that exact same color
+            int titleBarColor = GetTitleBarColor();
+            DwmSetWindowAttribute(this.Handle, DWMWA_CAPTION_COLOR, ref titleBarColor, sizeof(int));
+            DwmSetWindowAttribute(this.Handle, DWMWA_TEXT_COLOR, ref titleBarColor, sizeof(int));
+
+            // Match the window background to the titlebar too
+            this.BackColor = System.Drawing.ColorTranslator.FromWin32(titleBarColor);
+        }
+
+        // Returns the titlebar color as a COLORREF (0x00BBGGRR)
+        private int GetTitleBarColor()
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM"))
+            {
+                // "Show accent color on title bars and window borders" is on
+                if (key != null && key.GetValue("ColorPrevalence") is int prevalence && prevalence == 1 &&
+                    key.GetValue("AccentColor") is int accentColor)
+                {
+                    // AccentColor is stored as 0xAABBGGRR; dropping alpha gives a COLORREF
+                    return accentColor & 0x00FFFFFF;
+                }
+            }
+            // Default light titlebar
+            return System.Drawing.ColorTranslator.ToWin32(System.Drawing.Color.White);
+        }
+
+        private void SystemEvents_UserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            // Re-apply if the accent color or titlebar setting changes while running
+            if (e.Category == UserPreferenceCategory.General || e.Category == UserPreferenceCategory.Color)
+            {
+                ApplyTitleBarTextColor();
+            }
         }
 
         private void InitializeNVAPI()
         {
-            // Load nvapi64.dll from System32 for x64
-            string nvapi64Path = Path.Combine(@"C:\Windows\System32", "nvapi64.dll");
-            nvapiHandle = LoadLibrary(nvapi64Path);
-
-            // Get NVAPI function pointers
-            NvAPI_Initialize = nvapi_QueryInterface(0x0150E828); // NvAPI_Initialize
-            NvAPI_EnumNvidiaDisplayHandle = nvapi_QueryInterface(0x9ABDD40D); // NvAPI_EnumNvidiaDisplayHandle
-            NvAPI_SetDVCLevel = nvapi_QueryInterface(0x172409B4); // NvAPI_SetDVCLevel
-            NvAPI_GetDVCInfo = nvapi_QueryInterface(0x4085DE45); // NvAPI_GetDVCInfo
-
-            // Initialize NVAPI
-            var initializeDelegate = Marshal.GetDelegateForFunctionPointer<NvAPI_InitializeDelegate>(NvAPI_Initialize);
-            int status = initializeDelegate();
-            if (status == 0) // NVAPI_OK
+            try
             {
-                nvapiInitialized = true;
+                // Load nvapi64.dll from System32 for x64
+                string nvapi64Path = Path.Combine(@"C:\Windows\System32", "nvapi64.dll");
+                nvapiHandle = LoadLibrary(nvapi64Path);
+                if (nvapiHandle == IntPtr.Zero)
+                    return; // No NVIDIA driver installed
+
+                // Get NVAPI function pointers
+                NvAPI_Initialize = nvapi_QueryInterface(0x0150E828); // NvAPI_Initialize
+                NvAPI_EnumNvidiaDisplayHandle = nvapi_QueryInterface(0x9ABDD40D); // NvAPI_EnumNvidiaDisplayHandle
+                NvAPI_SetDVCLevel = nvapi_QueryInterface(0x172409B4); // NvAPI_SetDVCLevel
+                NvAPI_GetDVCInfo = nvapi_QueryInterface(0x4085DE45); // NvAPI_GetDVCInfo
+
+                if (NvAPI_Initialize == IntPtr.Zero || NvAPI_EnumNvidiaDisplayHandle == IntPtr.Zero ||
+                    NvAPI_SetDVCLevel == IntPtr.Zero || NvAPI_GetDVCInfo == IntPtr.Zero)
+                    return;
+
+                // Initialize NVAPI
+                var initializeDelegate = Marshal.GetDelegateForFunctionPointer<NvAPI_InitializeDelegate>(NvAPI_Initialize);
+                int status = initializeDelegate();
+                if (status == 0) // NVAPI_OK
+                {
+                    nvapiInitialized = true;
+                }
+            }
+            catch
+            {
+                // NVAPI unavailable (non-NVIDIA GPU or 32-bit process); digital vibrance will be skipped
+                nvapiInitialized = false;
             }
         }
 
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
+            SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
+
             if (nvapiHandle != IntPtr.Zero)
             {
                 FreeLibrary(nvapiHandle);
@@ -171,7 +221,6 @@ namespace Game_Mode
 
             // Clamp value to 0-63, as per DVChange
             if (dvcValue > 63) dvcValue = 63;
-            if (dvcValue < 0) dvcValue = 0;
 
             // Enumerate displays
             var enumDisplayDelegate = Marshal.GetDelegateForFunctionPointer<NvAPI_EnumNvidiaDisplayHandleDelegate>(NvAPI_EnumNvidiaDisplayHandle);
@@ -234,25 +283,31 @@ AdjustVolume=1
 ToggleHDR=1
 
 [GameModeLaunchAlso]
-;C:\Path\To\Example1.exe
-;C:\Path\To\Example2.exe
-;C:\Program Files\Game Mode\GM.bat
-;C:\Program Files\Cheat Happens Aurora\Aurora.exe
-;C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe
+C:\Program Files\Cheat Happens Aurora\Aurora.exe
+C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe
+C:\Windows\System32\taskmgr.exe
+C:\Program Files\Mozilla Firefox\firefox.exe
+C:\Program Files\Tools\Black Window.exe
 
 [DesktopModeLaunchAlso]
-;C:\Path\To\Example3.exe
-;C:\Path\To\Example4.exe
-;C:\Program Files\Game Mode\DM.bat
+C:\Program Files\Tools\EZWinGet.exe
+C:\Program Files\KeePass Password Safe 2\KeePass.exe
+C:\Program Files\Microsoft OneDrive\OneDrive.vbs
 
 [GameModeKillAlso]
-;Process names or full paths to EXE to terminate when entering Game Mode
-;discord.exe
-;C:\Program Files\Example\example.exe
+olk
+ms-teams
+CiscoCollabHost
+EZWinGet
+Claude
+OneDrive
+KeePass
 
 [DesktopModeKillAlso]
-;Process names or full paths to EXE to terminate when entering Desktop Mode
-;someBackgroundApp.exe
+C:\Program Files\Cheat Happens Aurora\Aurora.exe
+C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe
+taskmgr
+Black Window
 
 [VibranceSettings]
 GameVibe=12
@@ -264,7 +319,7 @@ Games
 Steam
 
 [GameSelectorExclusions]
-;3DMark
+3DMark
 Steam
 Steam Support Center
 ";
@@ -355,23 +410,48 @@ Steam Support Center
 
             // Store launchAlsoSettings in settings for simplicity
             settings["GameModeLaunchAlso"] = launchAlsoSettings.ContainsKey("GameModeLaunchAlso")
-                ? launchAlsoSettings["GameModeLaunchAlso"].ToDictionary(path => path, _ => "1")
+                ? ToListDictionary(launchAlsoSettings["GameModeLaunchAlso"])
                 : new Dictionary<string, string>();
             settings["DesktopModeLaunchAlso"] = launchAlsoSettings.ContainsKey("DesktopModeLaunchAlso")
-                ? launchAlsoSettings["DesktopModeLaunchAlso"].ToDictionary(path => path, _ => "1")
+                ? ToListDictionary(launchAlsoSettings["DesktopModeLaunchAlso"])
                 : new Dictionary<string, string>();
             // Store kill lists
             settings["GameModeKillAlso"] = launchAlsoSettings.ContainsKey("GameModeKillAlso")
-                ? launchAlsoSettings["GameModeKillAlso"].ToDictionary(path => path, _ => "1")
+                ? ToListDictionary(launchAlsoSettings["GameModeKillAlso"])
                 : new Dictionary<string, string>();
             settings["DesktopModeKillAlso"] = launchAlsoSettings.ContainsKey("DesktopModeKillAlso")
-                ? launchAlsoSettings["DesktopModeKillAlso"].ToDictionary(path => path, _ => "1")
+                ? ToListDictionary(launchAlsoSettings["DesktopModeKillAlso"])
                 : new Dictionary<string, string>();
             // Store game selector folders and exclusions in settings
-            settings["GameSelectorFolders"] = gameSelectorFolders.ToDictionary(folder => folder, _ => "1");
-            settings["GameSelectorExclusions"] = gameSelectorExclusions.ToDictionary(exclusion => exclusion, _ => "1");
+            settings["GameSelectorFolders"] = ToListDictionary(gameSelectorFolders);
+            settings["GameSelectorExclusions"] = ToListDictionary(gameSelectorExclusions);
 
             return settings;
+        }
+
+        // Convert an INI list section to a dictionary, ignoring duplicate entries
+        private Dictionary<string, string> ToListDictionary(IEnumerable<string> entries)
+        {
+            return entries
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(entry => entry, _ => "1", StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Parse an INI on/off value; accepts 1/0 as well as true/false
+        private bool TryParseSetting(string value, out bool result)
+        {
+            string trimmed = value?.Trim();
+            if (trimmed == "1")
+            {
+                result = true;
+                return true;
+            }
+            if (trimmed == "0")
+            {
+                result = false;
+                return true;
+            }
+            return bool.TryParse(trimmed, out result);
         }
 
         private System.Drawing.Color GetWindowsAccentColor()
@@ -526,6 +606,7 @@ Steam Support Center
             var games = paths
                 .Where(Directory.Exists)
                 .SelectMany(path => Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+                .Where(IsGameShortcut)
                 .Select(file => new
                 {
                     BaseName = RemoveTrademarkSymbols(Path.GetFileNameWithoutExtension(file)),
@@ -634,6 +715,29 @@ Steam Support Center
             selectorForm.Show();
         }
 
+        // Only list launchable shortcuts; skip hidden/system files (desktop.ini) and uninstallers
+        private bool IsGameShortcut(string file)
+        {
+            string extension = Path.GetExtension(file);
+            if (!string.Equals(extension, ".lnk", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".url", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".appref-ms", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            try
+            {
+                FileAttributes attributes = File.GetAttributes(file);
+                if ((attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+                    return false;
+            }
+            catch
+            {
+                return false;
+            }
+
+            return !Path.GetFileNameWithoutExtension(file).StartsWith("Uninstall", StringComparison.OrdinalIgnoreCase);
+        }
+
         private string GetSortName(string baseName)
         {
             string[] words = baseName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -692,7 +796,7 @@ Steam Support Center
 
             // Set button colors
             bool setButtonColors;
-            if (!gameModeSettings.TryGetValue("SetButtonColors", out string setButtonColorsValue) || !bool.TryParse(setButtonColorsValue, out setButtonColors))
+            if (!gameModeSettings.TryGetValue("SetButtonColors", out string setButtonColorsValue) || !TryParseSetting(setButtonColorsValue, out setButtonColors))
                 setButtonColors = true;
             if (setButtonColors)
             {
@@ -705,7 +809,7 @@ Steam Support Center
 
             // Launch game selector
             bool launchGameSelector;
-            if (!gameModeSettings.TryGetValue("LaunchGameSelector", out string launchGameSelectorValue) || !bool.TryParse(launchGameSelectorValue, out launchGameSelector))
+            if (!gameModeSettings.TryGetValue("LaunchGameSelector", out string launchGameSelectorValue) || !TryParseSetting(launchGameSelectorValue, out launchGameSelector))
                 launchGameSelector = true;
             if (launchGameSelector)
             {
@@ -714,7 +818,7 @@ Steam Support Center
 
             // Set high performance power plan silently
             bool setPowerPlan;
-            if (!gameModeSettings.TryGetValue("SetPowerPlan", out string setPowerPlanValue) || !bool.TryParse(setPowerPlanValue, out setPowerPlan))
+            if (!gameModeSettings.TryGetValue("SetPowerPlan", out string setPowerPlanValue) || !TryParseSetting(setPowerPlanValue, out setPowerPlan))
                 setPowerPlan = true;
             if (setPowerPlan)
             {
@@ -731,7 +835,7 @@ Steam Support Center
 
             // Set NVIDIA Digital Vibrance using GameVibe setting, default to 0
             bool setDigitalVibrance;
-            if (!gameModeSettings.TryGetValue("SetDigitalVibrance", out string setDigitalVibranceValue) || !bool.TryParse(setDigitalVibranceValue, out setDigitalVibrance))
+            if (!gameModeSettings.TryGetValue("SetDigitalVibrance", out string setDigitalVibranceValue) || !TryParseSetting(setDigitalVibranceValue, out setDigitalVibrance))
                 setDigitalVibrance = true;
             if (setDigitalVibrance)
             {
@@ -741,7 +845,7 @@ Steam Support Center
 
             // Simulate 50 volume up key presses
             bool adjustVolume;
-            if (!gameModeSettings.TryGetValue("AdjustVolume", out string adjustVolumeValue) || !bool.TryParse(adjustVolumeValue, out adjustVolume))
+            if (!gameModeSettings.TryGetValue("AdjustVolume", out string adjustVolumeValue) || !TryParseSetting(adjustVolumeValue, out adjustVolume))
                 adjustVolume = true;
             if (adjustVolume)
             {
@@ -754,7 +858,7 @@ Steam Support Center
 
             // Toggle HDR (assumes HDR is off or needs to be enabled)
             bool toggleHDR;
-            if (!gameModeSettings.TryGetValue("ToggleHDR", out string toggleHDRValue) || !bool.TryParse(toggleHDRValue, out toggleHDR))
+            if (!gameModeSettings.TryGetValue("ToggleHDR", out string toggleHDRValue) || !TryParseSetting(toggleHDRValue, out toggleHDR))
                 toggleHDR = true;
             if (toggleHDR)
             {
@@ -778,7 +882,7 @@ Steam Support Center
 
             // Play embedded gamemode.wav after 3.5-second delay without blocking the UI thread
             bool playSound;
-            if (!gameModeSettings.TryGetValue("PlaySound", out string playSoundValue) || !bool.TryParse(playSoundValue, out playSound))
+            if (!gameModeSettings.TryGetValue("PlaySound", out string playSoundValue) || !TryParseSetting(playSoundValue, out playSound))
                 playSound = true;
             if (playSound)
             {
@@ -795,7 +899,7 @@ Steam Support Center
 
             // Set button colors
             bool setButtonColors;
-            if (!desktopModeSettings.TryGetValue("SetButtonColors", out string setButtonColorsValue) || !bool.TryParse(setButtonColorsValue, out setButtonColors))
+            if (!desktopModeSettings.TryGetValue("SetButtonColors", out string setButtonColorsValue) || !TryParseSetting(setButtonColorsValue, out setButtonColors))
                 setButtonColors = true;
             if (setButtonColors)
             {
@@ -808,7 +912,7 @@ Steam Support Center
 
             // Set balanced power plan silently
             bool setPowerPlan;
-            if (!desktopModeSettings.TryGetValue("SetPowerPlan", out string setPowerPlanValue) || !bool.TryParse(setPowerPlanValue, out setPowerPlan))
+            if (!desktopModeSettings.TryGetValue("SetPowerPlan", out string setPowerPlanValue) || !TryParseSetting(setPowerPlanValue, out setPowerPlan))
                 setPowerPlan = true;
             if (setPowerPlan)
             {
@@ -825,7 +929,7 @@ Steam Support Center
 
             // Set NVIDIA Digital Vibrance using DeskVibe setting, default to 0
             bool setDigitalVibrance;
-            if (!desktopModeSettings.TryGetValue("SetDigitalVibrance", out string setDigitalVibranceValue) || !bool.TryParse(setDigitalVibranceValue, out setDigitalVibrance))
+            if (!desktopModeSettings.TryGetValue("SetDigitalVibrance", out string setDigitalVibranceValue) || !TryParseSetting(setDigitalVibranceValue, out setDigitalVibrance))
                 setDigitalVibrance = true;
             if (setDigitalVibrance)
             {
@@ -835,7 +939,7 @@ Steam Support Center
 
             // Simulate 50 volume down key presses
             bool adjustVolume;
-            if (!desktopModeSettings.TryGetValue("AdjustVolume", out string adjustVolumeValue) || !bool.TryParse(adjustVolumeValue, out adjustVolume))
+            if (!desktopModeSettings.TryGetValue("AdjustVolume", out string adjustVolumeValue) || !TryParseSetting(adjustVolumeValue, out adjustVolume))
                 adjustVolume = true;
             if (adjustVolume)
             {
@@ -848,7 +952,7 @@ Steam Support Center
 
             // Toggle HDR (assumes HDR is on or needs to be disabled)
             bool toggleHDR;
-            if (!desktopModeSettings.TryGetValue("ToggleHDR", out string toggleHDRValue) || !bool.TryParse(toggleHDRValue, out toggleHDR))
+            if (!desktopModeSettings.TryGetValue("ToggleHDR", out string toggleHDRValue) || !TryParseSetting(toggleHDRValue, out toggleHDR))
                 toggleHDR = true;
             if (toggleHDR)
             {
@@ -887,7 +991,14 @@ Steam Support Center
                     UseShellExecute = true,
                     Verb = "runas" // Run as admin
                 };
-                Process.Start(startInfo);
+                try
+                {
+                    Process.Start(startInfo);
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                    // User declined the UAC prompt
+                }
             }
         }
     }
